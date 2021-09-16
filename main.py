@@ -15,7 +15,7 @@ def menu():
   while True:
     p = input( "> " ).lower()
     if p == 'p':
-      print( "Play" )
+      character_select()
       break
     elif p == 'q':
       print( "Game closed." )
@@ -46,7 +46,17 @@ def data_main_init():
 
 def character_select():
 
-  pass
+  for i in range( len( g_data[ 'char_list' ] ) ):
+  	print( f"[Slot { i + 1 }] { g_data[ 'char_list' ][i] }" )
+  while True:
+  	try:
+  		p = int( input( "> " ) )
+  		if not ( 0 < p <= len( g_data[ 'char_list' ] ) ):
+  			print( "[ERROR] Out of range" )
+	  	else:
+	  		print( f"{ g_data[ 'char_list' ][ p - 1 ] }" )
+	  		break
+  	except: print( "[ERROR] Enter a number" )
 
 def run():
 
