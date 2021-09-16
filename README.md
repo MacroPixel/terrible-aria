@@ -1,4 +1,4 @@
-# Terraria 0.5
+# Terrible-aria
 terraria, but worse :D
 
 
