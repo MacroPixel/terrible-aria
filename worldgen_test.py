@@ -1,6 +1,3 @@
-# Won't be keeping this file long term
-# I'm only putting it here as a backup
-
 import pygame
 import numpy as np
 from math import sin, cos
@@ -77,23 +74,18 @@ class V2:
     c = V2( self.x, self.y )
     return c
 
-def print_progress( prog, div_this, div_total ):
+def print_progress( prog, div_this, div_total, s ):
 
   t = int( prog )
   prog += ( 1 / div_this ) * ( div_total / 2 )
   suffix = f'{ int( prog * 2 ) }% ' if prog < 50 else 'Done!'
-  if prog < 50:
-    if prog < 40: suffix += '(Generating initial terrain)'
-    elif prog < 42.5: suffix += '(Generating ore veins)'
-    elif prog < 45: suffix += '(Generating caves)'
-    elif prog < 47.5: suffix += '(Generating air pockets)'
-    elif prog < 50: suffix += '(Generating trees)'
-  print( '[' + ( '|' * int( prog ) ) + ( '-' * ( 50 - int( prog ) ) ) + ']  ' + suffix + ( ' ' * 20 ), end = '\r' )
+  if prog < 50: suffix += f'({ s })'
+  print( '[' + ( '|' * int( prog ) ) + ( '-' * ( 50 - int( prog ) ) ) + ']  ' + suffix + ( ' ' * 30 ), end = '\r' )
   return prog
 
 def noise_top( x ):
 
-  next_seed = random.randint( 1000, 9999 )
+  next_seed = random.randint( 1, 10 ** 12 )
   random.seed( WORLD_SEED )
   s = 0
   for i in range( 12 ):
@@ -102,7 +94,7 @@ def noise_top( x ):
   return s / 4;
 
 world_size = V2( 400, 200 )
-screen_size = world_size.copy().m( 3 )
+screen_size = world_size.copy().m( 1 )
 g_tile_data = ''
 
 def generate_world():
@@ -120,27 +112,33 @@ def generate_world():
 
   for j in range( world_size.y ):
     for i in range( world_size.x ):
-      is_stone = j >= ( world_size.y / 2 ) + noise_top( i )
-      is_grass = is_stone and ( j <= ( world_size.y / 2 ) + noise_top( i ) + 3 )
-      is_stone = is_stone and not is_grass
-      if is_grass: g_tile_data += 'Ξ'
-      elif is_stone: g_tile_data += '#'
-      else: g_tile_data += ' '
-    progress = print_progress( progress, world_size.y, 80 )
+      g_tile_data += ' '
+    progress = print_progress( progress, world_size.y, 5, 'Creating world array' )
   g_tile_data = list( g_tile_data )
 
+  for i in range( world_size.x ):
+    t = int( ( world_size.y / 2 ) + noise_top( i ) )
+    for j in range( t, t + 4 ):
+      g_tile_data[ xy2c( i, j, world_size.x ) ] = 'Ξ'
+    for j in range( t + 4, world_size.y ):
+      g_tile_data[ xy2c( i, j, world_size.x ) ] = '#'
+    progress = print_progress( progress, world_size.x, 15, 'Generating initial terrain' )
+
   if ORES:
-    for l1 in range( 256 ):
+    for l1 in range( 128 ):
       o = V2( random.randint( 0, world_size.x ), 0 )
       o.y = random.randint( int( ( world_size.y / 2 ) + noise_top( o.x ) ) + 10, world_size.y )
       d = 0
-      c = random.choice( ( '⩏', '⩏', '⩏', '⩎', '⩎', '⩩' ) )
-      for l2 in range( 64 ):
+      if ( o.y / world_size.y < 0.65 ): c = '⩏'
+      elif ( o.y / world_size.y < 0.75 ): c = random.choice( ( '⩏', '⩏', '⩎' ) )
+      else: c = random.choice( ( '⩏', '⩏', '⩏', '⩎', '⩎', '⩩' ) )
+      for l2 in range( 48 ):
         d += random.randrange( -10, 10 ) 
         o.a( cos( d ), sin( d ) )
+        if o.y < ( world_size.y / 2 ) + noise_top( o.x ) + 4: continue
         g_tile_data[ xy2c( clamp( int( o.x ), 1, world_size.x - 2 ), clamp( int( o.y ), 1, world_size.y - 2 ), world_size.x ) ] = c
-      progress = print_progress( progress, 128, 5 )
-  else: progress = print_progress( progress, 1, 5 )
+      progress = print_progress( progress, 128, 40, 'Generating ore veins' )
+  else: progress = print_progress( progress, 1, 40, 'Generating ore veins' )
 
   if CAVES:
     for l1 in range( 32 ):
@@ -155,8 +153,8 @@ def generate_world():
         for j in range( max( int( o.y ) - int( s ), 1 ), min( int( o.y ) + int( s ), world_size.y - 2 ) ):
           for i in range( max( int( o.x ) - int( s ), 1 ), min( int( o.x ) + int( s ), world_size.x - 2 ) ):
             if dist( o, V2( i, j ) ) < s: g_tile_data[ xy2c( i, j, world_size.x ) ] = ' '
-      progress = print_progress( progress, 32, 5 )
-  else: progress = print_progress( progress, 1, 5 )
+      progress = print_progress( progress, 32, 20, 'Generating caves' )
+  else: progress = print_progress( progress, 1, 20, 'Generating caves' )
 
   if POCKETS:
     for l1 in range( 128 ):
@@ -167,8 +165,8 @@ def generate_world():
         d += random.randrange( -10, 10 ) 
         o.a( cos( d ), sin( d ) )
         g_tile_data[ xy2c( clamp( int( o.x ), 1, world_size.x - 2 ), clamp( int( o.y ), 1, world_size.y - 2 ), world_size.x ) ] = ' '
-      progress = print_progress( progress, 128, 5 )
-  else: progress = print_progress( progress, 1, 5 )
+      progress = print_progress( progress, 128, 15, 'Generating ore veins' )
+  else: progress = print_progress( progress, 1, 15, 'Generating ore veins' )
 
   if TREES:
     i1 = random.randint( 5, 15 )
@@ -185,8 +183,9 @@ def generate_world():
             if random.randint( 0, int( dist( V2( i, j ), o ) ) ) <= 1:
               g_tile_data[ xy2c( i, j, world_size.x ) ] = '∷'
       i1 += int( random.randint( 8, 15 ) * random.choice( ( 0.6, 1, 1, 4 ) ) )
-    progress = print_progress( progress, 1, 5 )
-  else: progress = print_progress( progress, 1, 5 )
+    progress = print_progress( progress, 1, 5, 'Generating trees' )
+  else: progress = print_progress( progress, 1, 5, 'Generating trees' )
+  print_progress( 50, 1, 1, 'ERROR' )
   print()
 
 
