@@ -29,7 +29,9 @@ def item_data( item_id, component = 0, c = 0 ):
   DATA = [
     [ 'NULL', 'An item you shouldn\'t have' ],
     [ 'Copper Shortsword', 'Better than nothing!' ],
-    [ 'Copper Pickaxe', 'The best pick in the game. (Also the only pick in the game)' ],
+    [ 'Copper Pickaxe', 'The best pick in the game. (Also the only pick in the game).' ],
+    [ 'Grass', 'Not useful for much, but you\'ll acquire it anyway.' ],
+    [ 'Stone', 'The most prevalent material in the world.' ],
     [ 'Wood', 'A reliable building block.' ]
   ]
 
@@ -166,6 +168,11 @@ def noise_top( x, seed ):
 # GLOBAL CONSTANTS
 DEBUG = True
 AIR_BLOCKS = [ ' ', 'l', 'L' ]
+ITEM_BLOCKS = {
+  'g': 3,
+  's': 4,
+  'w': 5
+}
 SHOW_PROG = True
 
 # GLOBAL VARIABLES
@@ -255,8 +262,8 @@ def data_char_init( name ):
   # Open/write to file
   file = open( 'c_' + name + '.txt', 'w' )
   file.write( 'hp: 100,100\n' )
-  file.write( 'items: ' )
-  for i in range( 16 ):
+  file.write( 'items: 1:1,2:1,' ) # Defaults to sword/pickaxe
+  for i in range( 14 ):
     file.write( '0:0' + ( ',' if i != 15 else '' ) )
   file.write( '\nplay_time: 0' )
 
@@ -845,6 +852,14 @@ def room_scene():
     print( '[H <command name>] Help with a specific command' )
     g_show_help = False
 
+  goto_room( room_scene_hidden )
+
+# Alternate World Scene
+# (Used when re-entering without wanting to re-show world)
+def room_scene_hidden():
+
+  global g_pos, g_view, g_show_help, g_slot
+
   while True:
     p = input( '> ' ).lower()
 
@@ -858,6 +873,7 @@ def room_scene():
       print( '[I] Inventory' )
       print( '[S] Select Item' )
       print( '[B] Break' )
+      print( '[P] Break' )
       if DEBUG: print( '[$] Debug' )
       print( '[*] Pause' )
 
@@ -895,6 +911,13 @@ def room_scene():
         print( '[?] Syntax: b <direction>' )
         print( '[?] Breaks the block 1 unit away from the player in the specified direction.' )
         print( '[?] (Accepted directions are "left", "right", "up", and "down".)' )
+      elif p[2:] == 'p':
+        print( '[?] Syntax: p <x> <y>' )
+        print( '[?] Places the selected block x units right of the player and y units below the player.' )
+        print( '[?] (Maximum is 4 blocks away in any direction.)' )
+        print( '[?] Syntax: p <direction>' )
+        print( '[?] Places the selected block 1 unit away from the player in the specified direction.' )
+        print( '[?] (Accepted directions are "left", "right", "up", and "down".)' )
       elif p[2:] == '$' and DEBUG:
         print( '[?] Syntax: $ <command> <arguments>' )
         print( '[?] Effect: Runs a sub-command.' )
@@ -924,7 +947,7 @@ def room_scene():
 
       # Make sure direction is valid
       if p.split( ' ' )[1] not in ( 'right', 'r', 'left', 'l' ):
-        print( '[#] Invalid direction. (Accepts: "right", "left", "r", "l")')
+        print( '[#] Invalid direction. (Accepts: "right", "left", "r", "l")' )
 
       else:
 
@@ -963,7 +986,7 @@ def room_scene():
           t = int( p[2:] )
         except ValueError:
           print( '[#] Enter a number.' )
-          p = 'ERROR'
+          t = 'ERROR'
       else:
         t = 5
 
@@ -973,8 +996,8 @@ def room_scene():
         if not ( 0 < t <= 5 ):
           print( '[#] Jump height out of range.' )
 
-        # If not on block, run game tick and reload stage
-        elif get_tile( g_pos.x, g_pos.y + 1 ) in AIR_BLOCKS:
+        # If not on block and not on floor, run game tick and reload stage
+        elif g_pos.y + 1 < g_world_size.y and get_tile( g_pos.x, g_pos.y + 1 ) in AIR_BLOCKS:
           tick()
           goto_room( room_scene )
 
@@ -1017,18 +1040,16 @@ def room_scene():
     elif p == 'b':
       print( '[#] Must supply direction.' )
 
-    elif p[:2] == 'b ':
+    elif p[:2] == 'b ' or p[:2] == 'p ':
 
       # Check if it is a direction
-      if p[2:] in ( 'left', 'right', 'down', 'up' ):
+      if p[2:] in ( 'left', 'right', 'down', 'up', 'l', 'r', 'd', 'u' ):
 
-        # Break block
-        # break_block() performs bounds checking, so there's no need to check whether our break position is within the world
-        # Also, performing a game tick prevents the player from floating above it like a cartoon character
-        break_block( *g_pos.copy().a( ( V2( -1, 0 ), V2( 1, 0 ), V2( 0, 1 ), V2( 0, -1 ) )[ ( 'left', 'right', 'down', 'up' ).index( p[2:] ) ] ).l() )
-        # ↑ The ability to do ridiculous stuff like this is why I love Python
-        tick()
-        goto_room( room_scene )
+        # Attempt to either break or place the block
+        if p[0] == 'b':
+          try_break_block( *( V2( -1, 0 ), V2( 1, 0 ), V2( 0, 1 ), V2( 0, -1 ) )[ ( 'l', 'r', 'd', 'u' ).index( p[2] ) ].l() )
+        else:
+          try_place_block( *( V2( -1, 0 ), V2( 1, 0 ), V2( 0, 1 ), V2( 0, -1 ) )[ ( 'l', 'r', 'd', 'u' ).index( p[2] ) ].l() )
 
       # Check if it's coordiantes
       elif len( p[2:].split( ' ' ) ) == 2:
@@ -1044,15 +1065,17 @@ def room_scene():
           # Temporary variables used for easier formatting
           t1 = ( -4 <= p[0] <= 4 )
           t2 = ( -4 <= p[1] <= 4 )
-          print( f"[#] { '' if t1 else 'X' }{ '' if t1 or t2 else ' and ' }{ '' if t2 else 'Y' } coordinate{ '' if t1 or t2 else 's' } out of range. (Valid range: [-4, 4].)" )
+          if not ( t1 and t2 ):
+            print( f"[#] { '' if t1 else 'X' }{ '' if t1 or t2 else ' and ' }{ '' if t2 else 'Y' } coordinate{ '' if t1 or t2 else 's' } out of range. (Valid range: [-4, 4].)" )
 
-          # If both coordinates are valid, then break the block
-          # break_block() performs bounds checking, so there's no need to check whether our break position is within the world
-          # Also, performing a game tick prevents the player from floating above it like a cartoon character
+          # If both coordinates are valid, then continue onward
           if t1 and t2:
-            break_block( g_pos.x + p[0], g_pos.y + p[1] )
-            tick()
-            goto_room( room_scene )
+
+            # Attempt to either break or place the block
+            if p[0] == 'b':
+              try_break_block( p[0], p[1] )
+            else:
+              try_place_block( p[0], p[1] )
 
       # Invalid arguments
       else:
@@ -1126,7 +1149,7 @@ def tick( nofall = False ):
   # Move player 5 blocks downward
   if not nofall:
     for i in range( 5 ):
-      if g_pos.y != g_world_size.y and get_tile( g_pos.copy().a( 0, 1 ) ) in AIR_BLOCKS:
+      if g_pos.y + 1 < g_world_size.y and get_tile( g_pos.copy().a( 0, 1 ) ) in AIR_BLOCKS:
         g_pos.y += 1
   
   data_world_update( g_wname )
@@ -1191,7 +1214,7 @@ def update_inv( item_id, amount, mode = 'p', slot = 0 ):
   data_char_update( g_cname )
 
 # Break a block
-def break_block( x, y, pick = 0 ):
+def break_block( x, y ):
 
   global g_tile_data
 
@@ -1199,7 +1222,97 @@ def break_block( x, y, pick = 0 ):
   if not ( 0 <= x < g_world_size.x ): return
   if not ( 0 <= y < g_world_size.y ): return
 
+  # Store what the block was, then change it
+  t = g_tile_data[ xy2c( x, y, g_world_size.x ) ]
   g_tile_data[ xy2c( x, y, g_world_size.x ) ] = ' '
+  data_world_update( g_wname ) # Save data
+
+  # Return what the block was
+  return t
+
+# Place a block
+def place_block( x, y ):
+
+  global g_tile_data
+
+  # Make sure it's within the world boundaries
+  if not ( 0 <= x < g_world_size.x ): return
+  if not ( 0 <= y < g_world_size.y ): return
+
+  # If the block is air, replace it
+  if g_tile_data[ xy2c( x, y, g_world_size.x ) ] == ' ':
+
+    # Get the block ID of the currently selected item ID
+    g_tile_data[ xy2c( x, y, g_world_size.x ) ] = list( ITEM_BLOCKS.keys() )[ list( ITEM_BLOCKS.values() ).index( g_items[ g_slot ][0] ) ]
+    data_world_update( g_wname ) # Save data
+    return True
+
+  # Else, return False to indicate failure
+  return False
+  
+
+# This function exists to reduce code repetition
+def try_break_block( x, y ):
+
+  # Check whether the player is holding a pickaxe
+
+  # Not holding anything
+  if g_items[ g_slot ][1] <= 0:
+    print( f'[!] You are not holding an item!' )
+    goto_room( room_scene_hidden )
+
+  # Not holding pickaxe
+  elif g_items[ g_slot ][0] != 2:
+    print( f'[!] Item "{ item_data( g_slot, c = 1 ) }" cannot break blocks!' )
+    goto_room( room_scene_hidden )
+
+  # Holding pickaxe
+  else:
+
+    # Break block
+    # break_block() performs bounds checking, so there's no need to check whether our break position is within the world
+    t = break_block( g_pos.x + x, g_pos.y + y )
+
+    # break_block() returns the ID of the block that was broken, which is stored in t
+    # If possible, this block is put in the player's inventory
+    if t in ITEM_BLOCKS:
+      update_inv( ITEM_BLOCKS[ t ], 1 )
+
+    # Performing a game tick prevents the player from floating above it like a cartoon character
+    tick()
+    goto_room( room_scene ) # We can now reload the room
+
+# This function also exists to reduce code repetition
+# (even though it's pretty much just an inverse of the above function)
+def try_place_block( x, y ):
+
+  # Check whether the player is holding a block
+
+  # Not holding anything
+  if g_items[ g_slot ][1] <= 0:
+    print( f'[!] You are not holding an item!' )
+    goto_room( room_scene_hidden )
+
+  # Not holding a block
+  elif g_items[ g_slot ][0] not in ITEM_BLOCKS.values():
+    print( f'[!] Item "{ item_data( g_slot, c = 1 ) }" is not placeable!' )
+    goto_room( room_scene_hidden )
+
+  # Holding a block
+  else:
+
+    # Place block
+    # place_block() performs bounds checking, so there's no need to check whether our break position is within the world
+    t = place_block( g_pos.x + x, g_pos.y + y )
+
+    # place_block() returns whether the attempt was successful, which is stored in t
+    # If successful, one block is removed from the player's inventory
+    if t:
+      update_inv( g_items[ g_slot ][0], 1, 'r' )
+
+    # Performing a game tick prevents the player from floating above it like a cartoon character
+    tick()
+    goto_room( room_scene ) # We can now reload the room
 
 # Inventory Room
 def room_inventory():
@@ -1331,6 +1444,10 @@ def room_inventory_hidden():
         # Make sure it has an item in it
         elif g_items[ list( '1234567890ABCDEF' ).index( p ) ][1] == 0:
           print( '[#] This slot is empty.' )
+
+        # Make sure the item isn't a pickaxe
+        elif g_items[ list( '1234567890ABCDEF' ).index( p ) ][0] == 2:
+          print( '[#] "Copper Pickaxe" cannot be trashed!' )
 
         # Trash the item, and re-show inventory
         else:
