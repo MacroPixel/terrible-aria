@@ -42,6 +42,11 @@ def xy2c( x, y, w ):
 
   return ( y * w ) + x
 
+# Inflates a 1D index [c] into a 2D index [x, y]
+def c2xy( c, w ):
+
+  return ( c % w, c // w )
+
 # Converts a block's character-ID into the character displayed in-game
 def char2tile( c ):
 
@@ -140,7 +145,8 @@ def print_progress( prog, div_this, div_total, s ):
   suffix = f'{ int( prog * 2 ) }% ' if prog < 50 else 'Done!' # Create a suffix that contains the progress/current task
   if prog < 50:
     suffix += f'({ s })'
-  print( '[' + ( '|' * int( prog ) ) + ( '-' * ( 50 - int( prog ) ) ) + ']  ' + suffix + ( ' ' * 30 ), end = '\r' )
+  if SHOW_PROG:
+    print( '[' + ( '|' * int( prog ) ) + ( '-' * ( 50 - int( prog ) ) ) + ']  ' + suffix + ( ' ' * 30 ), end = '\r' )
   return prog
 
 # A function used for the top of the world
@@ -160,6 +166,7 @@ def noise_top( x, seed ):
 # GLOBAL CONSTANTS
 DEBUG = True
 AIR_BLOCKS = [ ' ', 'l', 'L' ]
+SHOW_PROG = True
 
 # GLOBAL VARIABLES
 g_data = {}
@@ -172,6 +179,7 @@ g_seed = 0
 g_hp = 0
 g_hp_max = 0
 g_items = []
+g_slot = 0
 g_play_time = 0
 g_tile_data = []
 g_show_help = True
@@ -480,7 +488,7 @@ def data_world_init( name, seed ):
 # Load a world file with a given name
 def data_world_load( name ):
 
-  global g_pos, g_world_size, g_seed, g_tile_data, g_show_help
+  global g_pos, g_world_size, g_seed, g_tile_data, g_show_help, g_slot
 
   # Split file into statements
   file = open( 'w_' + name + '.txt', 'r' ).read().split( '\n' )
@@ -497,6 +505,7 @@ def data_world_load( name ):
   g_tile_data = list( g_tile_data )
 
   g_show_help = True # Shows a help message on your first turn in the world
+  g_slot = 0 # Reset selected slot
 
 # Write back to the world file if something changed
 def data_world_update( name ):
@@ -576,43 +585,43 @@ def room_character_select():
       goto_room( room_menu )
 
     # Delete character
-    elif p == 'd' or p[0:2] == 'd ':
+    elif p == 'd':
 
-      # Forgot index
-      if len( p ) <= 2:
-        print( '[#] Must supply character index.' )
+      # Get index
+      print( 'Enter the character slot would like to delete: ' )
+      while True:
+        p = input( '> ' )
 
-      # Attempt cast
-      try:
-        int( p[2:] )
-      except ValueError:
-        print( '[#] Must supply a number.' )
-
-      else:
-
-        # Too large/too small
-        if not ( 0 < int( p[2:] ) <= len( g_data[ 'char_list' ] ) ):
-          print( '[#] Out of range.' )
-
+        # Attempt cast
+        try:
+          p = int( p )
+        except ValueError:
+          print( '[#] Enter a number.' )
         else:
 
-          # Store name in a temp variable so I don't have to retype this mess ↓
-          t = g_data[ 'char_list' ][ int( p[2:] ) - 1 ]
+          # Too large/too small
+          if not ( 0 < p <= len( g_data[ 'char_list' ] ) ):
+            print( '[#] Out of range.' )
 
-          # Make sure they actually want to
-          print( f'Are you sure you want to delete character "{ t }"?' )
-          print( 'Type "yes" to proceed.' )
-          if input( '> ' ).lower() == 'yes':
+          else:
 
-            # Delete character file and update character list in data.txt
-            print( '[!] Character deleted.' )
-            if os.path.exists( 'c_' + t + '.txt' ):
-              os.remove( 'c_' + t + '.txt' )
-            g_data[ 'char_list' ].pop( int( p[2:] ) - 1 )
-            data_main_update()
+            # Store name in a temp variable so I don't have to retype this mess ↓
+            t = g_data[ 'char_list' ][ p - 1 ]
 
-          # Re-show character list
-          goto_room( room_character_select )
+            # Make sure they actually want to
+            print( f'Are you sure you want to delete character "{ t }"?' )
+            print( 'Type "yes" to proceed.' )
+            if input( '> ' ).lower() == 'yes':
+
+              # Delete character file and update character list in data.txt
+              print( '[!] Character deleted.' )
+              if os.path.exists( 'c_' + t + '.txt' ):
+                os.remove( 'c_' + t + '.txt' )
+              g_data[ 'char_list' ].pop( p - 1 )
+              data_main_update()
+
+            # Re-show character list
+            goto_room( room_character_select )
     
     # Either number or invalid input
     else:
@@ -689,43 +698,46 @@ def room_world_select():
       goto_room( room_character_select )
 
     # Delete world
-    elif p == 'd' or p[0:2] == 'd ':
+    elif p == 'd':
 
-      # Forgot index
-      if len( p ) <= 2:
-        print( '[#] Must supply world index.' )
+      # Get index
+      print( 'Enter the world slot would like to delete: ' )
+      while True:
+        p = input( '> ' )
 
-      # Attempt cast
-      try:
-        int( p[2:] )
-      except ValueError:
-        print( '[#] Must supply a number.' )
-
-      else:
-
-        # Too large/too small
-        if not ( 0 < int( p[2:] ) <= len( g_data[ 'world_list' ] ) ):
-          print( '[#] Out of range.' )
+        # Attempt cast
+        try:
+          p = int( p )
+        except ValueError:
+          print( '[#] Must supply a number.' )
 
         else:
 
-          # Store name in a temp variable so I don't have to retype this mess ↓
-          t = g_data[ 'world_list' ][ int( p[2:] ) - 1 ]
+          print( p )
 
-          # Make sure they actually want to
-          print( f'Are you sure you want to delete world "{ t }"?' )
-          print( 'Type "yes" to proceed.' )
-          if input( '> ' ).lower() == 'yes':
+          # Too large/too small
+          if not ( 0 < p <= len( g_data[ 'world_list' ] ) ):
+            print( '[#] Out of range.' )
 
-            # Delete world file and update world list in data.txt
-            print( '[!] World deleted.' )
-            if os.path.exists( 'w_' + t + '.txt' ):
-              os.remove( 'w_' + t + '.txt' )
-            g_data[ 'world_list' ].pop( int( p[2:] ) - 1 )
-            data_main_update()
+          else:
 
-          # Re-show world list
-          goto_room( room_world_select )
+            # Store name in a temp variable so I don't have to retype this mess ↓
+            t = g_data[ 'world_list' ][ p - 1 ]
+
+            # Make sure they actually want to
+            print( f'Are you sure you want to delete world "{ t }"?' )
+            print( 'Type "yes" to proceed.' )
+            if input( '> ' ).lower() == 'yes':
+
+              # Delete world file and update world list in data.txt
+              print( '[!] World deleted.' )
+              if os.path.exists( 'w_' + t + '.txt' ):
+                os.remove( 'w_' + t + '.txt' )
+              g_data[ 'world_list' ].pop( p - 1 )
+              data_main_update()
+
+            # Re-show world list
+            goto_room( room_world_select )
 
     # Either number or invalid input
     else:
@@ -803,7 +815,7 @@ def room_world_create():
 #
 def room_scene():
 
-  global g_pos, g_view, g_show_help
+  global g_pos, g_view, g_show_help, g_slot
 
   # Set view position, setting it offset (-30, -20) from the player pos,
   # then ensuring it stays within the world border
@@ -811,9 +823,10 @@ def room_scene():
   g_view.x = clamp( g_pos.x - 30, 0, g_world_size.x - 61 )
   g_view.y = clamp( g_pos.y - 20, 0, g_world_size.y - 41 )
 
-  # Print HP
+  # Print important data (HP, item)
   print_line()
   print( f'HP: { g_hp }/{ g_hp_max }' )
+  print( f'ITEM: { item_data( g_slot, c = 1 ) if g_items[ g_slot ][1] > 0 else "..." }' )
   print()
 
   # Display world
@@ -843,6 +856,8 @@ def room_scene():
       print( '[J] Jump' )
       print( '[W] Wait' )
       print( '[I] Inventory' )
+      print( '[S] Select Item' )
+      print( '[B] Break' )
       if DEBUG: print( '[$] Debug' )
       print( '[*] Pause' )
 
@@ -867,8 +882,19 @@ def room_scene():
         print( '[?] Syntax: w' )
         print( '[?] Effect: Allows a game tick to pass without the player performing an action.' )
       elif p[2:] == 'i':
-        print( '[?] Syntax: i')
+        print( '[?] Syntax: i' )
         print( '[?] Effect: Opens the inventory.' )
+      elif p[2:] == 's':
+        print( '[?] Syntax: s <slot ID>' )
+        print( '[?] Effect: Selects the item in a given slot.' )
+        print( '[?] (Open your inventory to check slot IDs.)' )
+      elif p[2:] == 'b':
+        print( '[?] Syntax: b <x> <y>' )
+        print( '[?] Breaks the block x units right of the player and y units below the player.' )
+        print( '[?] (Maximum is 4 blocks away in any direction.)' )
+        print( '[?] Syntax: b <direction>' )
+        print( '[?] Breaks the block 1 unit away from the player in the specified direction.' )
+        print( '[?] (Accepted directions are "left", "right", "up", and "down".)' )
       elif p[2:] == '$' and DEBUG:
         print( '[?] Syntax: $ <command> <arguments>' )
         print( '[?] Effect: Runs a sub-command.' )
@@ -904,8 +930,9 @@ def room_scene():
 
           # Attempt cast
           try:
-            int( p.split( ' ' )[2] )
-          except ValueError:
+            if len( p.split( ' ' ) ) >= 3:
+              int( p.split( ' ' )[2] )
+          except Exception:
             print( '[#] Enter a number.' )
 
           else:
@@ -920,8 +947,9 @@ def room_scene():
             # Move in given direction, run game tick, save data, and reload stage
             else:
               for i in range( t ):
-                if get_tile( g_pos.x + ( 1 if p.split( ' ' )[1][0] == 'r' else -1 ), g_pos.y ) in AIR_BLOCKS:
-                  g_pos.x += ( 1 if p.split( ' ' )[1][0] == 'r' else -1 )
+                if ( 0 <= g_pos.x + ( 1 if p.split( ' ' )[1][0] == 'r' else -1 ) < g_world_size.x ):
+                  if get_tile( g_pos.x + ( 1 if p.split( ' ' )[1][0] == 'r' else -1 ), g_pos.y ) in AIR_BLOCKS:
+                    g_pos.x += ( 1 if p.split( ' ' )[1][0] == 'r' else -1 )
               data_world_update( g_wname )
               tick()
               goto_room( room_scene )
@@ -967,6 +995,68 @@ def room_scene():
     # Inventory
     elif p == 'i':
       goto_room( room_inventory )
+
+    # Select
+    elif p == 's':
+      print( '[#] Must supply slot ID.' )
+
+    elif p[:2] == 's ':
+
+      # Make sure it matches a slot
+      if p[2:] not in list( '1234567890ABCDEF' ):
+        print( '[#] Enter a number from 0-9 or a letter from A-F.' )
+
+      else:
+
+        # Select slot
+        g_slot = list( '1234567890ABCDEF' ).index( p[2:] )
+        print( f'[!] Selected "{ item_data( g_slot, c = 1 ) }".' if g_items[ g_slot ][1] > 0 else '[!] Cleared selection.' )
+        goto_room( room_scene )
+
+    # Break
+    elif p == 'b':
+      print( '[#] Must supply direction.' )
+
+    elif p[:2] == 'b ':
+
+      # Check if it is a direction
+      if p[2:] in ( 'left', 'right', 'down', 'up' ):
+
+        # Break block
+        # break_block() performs bounds checking, so there's no need to check whether our break position is within the world
+        # Also, performing a game tick prevents the player from floating above it like a cartoon character
+        break_block( *g_pos.copy().a( ( V2( -1, 0 ), V2( 1, 0 ), V2( 0, 1 ), V2( 0, -1 ) )[ ( 'left', 'right', 'down', 'up' ).index( p[2:] ) ] ).l() )
+        # ↑ The ability to do ridiculous stuff like this is why I love Python
+        tick()
+        goto_room( room_scene )
+
+      # Check if it's coordiantes
+      elif len( p[2:].split( ' ' ) ) == 2:
+
+        try:
+          p = [ int( p[2:].split( ' ' )[0] ), int( p[2:].split( ' ' )[1] ) ]
+        except ValueError:
+          print( '[#] Enter 2 numbers.' )
+
+        else:
+
+          # Check range
+          # Temporary variables used for easier formatting
+          t1 = ( -4 <= p[0] <= 4 )
+          t2 = ( -4 <= p[1] <= 4 )
+          print( f"[#] { '' if t1 else 'X' }{ '' if t1 or t2 else ' and ' }{ '' if t2 else 'Y' } coordinate{ '' if t1 or t2 else 's' } out of range. (Valid range: [-4, 4].)" )
+
+          # If both coordinates are valid, then break the block
+          # break_block() performs bounds checking, so there's no need to check whether our break position is within the world
+          # Also, performing a game tick prevents the player from floating above it like a cartoon character
+          if t1 and t2:
+            break_block( g_pos.x + p[0], g_pos.y + p[1] )
+            tick()
+            goto_room( room_scene )
+
+      # Invalid arguments
+      else:
+        print( '[#] Enter either a direction or a coordinate pair.' )
 
     # Debug command (requires debug mode)
     elif p == '$' and DEBUG:
@@ -1050,9 +1140,9 @@ def update_inv( item_id, amount, mode = 'p', slot = 0 ):
   # Pickup mode
   if mode == 'p':
 
-    # First try to stack
+    # First try to stack (MAKE SURE SLOT ISN'T EMPTY)
     for i in range( 16 ):
-      if g_items[i][0] == item_id:
+      if g_items[i][0] == item_id and g_items[i][1] > 0:
         g_items[i][1] += amount
         break
 
@@ -1099,6 +1189,17 @@ def update_inv( item_id, amount, mode = 'p', slot = 0 ):
 
   # Update character file
   data_char_update( g_cname )
+
+# Break a block
+def break_block( x, y, pick = 0 ):
+
+  global g_tile_data
+
+  # Make sure it's within the world boundaries
+  if not ( 0 <= x < g_world_size.x ): return
+  if not ( 0 <= y < g_world_size.y ): return
+
+  g_tile_data[ xy2c( x, y, g_world_size.x ) ] = ' '
 
 # Inventory Room
 def room_inventory():
@@ -1195,7 +1296,7 @@ def room_inventory_hidden():
         # Move item and re-show inventory
         else:
 
-          # Shorten indicies/store swap buffer
+          # Shorten indices/store swap buffer
           t = list( '1234567890ABCDEF' ).index( t )
           p = list( '1234567890ABCDEF' ).index( p )
           swap_buffer = g_items[t].copy() 
@@ -1234,8 +1335,8 @@ def room_inventory_hidden():
         # Trash the item, and re-show inventory
         else:
           p = list( '1234567890ABCDEF' ).index( p )
-          print( f'[!] Trashed item "{ item_data( p ) }"' )
-          update_inv( 0, 0, mode = 's', slot = g_items[p][0] )
+          print( f'[!] Trashed item "{ item_data( p, c = 1 ) }"' )
+          update_inv( 0, 0, mode = 's', slot = p )
           goto_room( room_inventory )
 
     # Back
