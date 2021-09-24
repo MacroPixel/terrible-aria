@@ -2,6 +2,7 @@ import os
 from math import sin, cos
 import random
 import traceback
+import time
 
 # Returns a number such that min <= x <= max
 def clamp( n, mn, mx ):
@@ -122,6 +123,25 @@ class V2:
     c = V2( self.x, self.y )
     return c
 
+# Base Monster class
+class Monster:
+
+  def __init__( self ):
+
+    self.hp = 1
+    self.name = 'MISSING'
+
+  def damage( self, amount ):
+
+    self.hp -= amount
+
+class MonsterSlime( Monster ):
+
+  def __init__( self ):
+
+    self.hp = 20
+    self.name = 'Slime'
+
 # Switches rooms
 def goto_room( room, arg = '' ):
   raise MoveException( room, arg )
@@ -188,6 +208,7 @@ ITEM_META = [
 ]
 AIR_BLOCKS = [ ' ', 'l', 'L' ]
 ITEM_BLOCKS = { 'g': I_GRASS, 's': I_STONE, 'w': I_WOOD, 'i': I_IRON_ORE, 'S': I_SILVER_ORE, 'G': I_GOLD_ORE }
+MONSTERS = { 'slime' }
 
 # GLOBAL VARIABLES
 g_data = {}
@@ -217,6 +238,7 @@ g_tmap = {
   'wood': '=',
   'chest': '©'
 }
+g_monster = 0
 
 # Initialize the data file if it doesn't exist
 def data_main_init():
@@ -838,7 +860,7 @@ def room_world_create():
 #
 def room_scene( arg = '' ):
 
-  global g_pos, g_view, g_tile_data, g_show_help, g_slot
+  global g_pos, g_view, g_tile_data, g_show_help, g_slot, g_monster
 
   # Args can be set to 1 to avoid re-printing room data
   if not ( len( arg ) > 0 and arg[0] == '1' ):
@@ -945,6 +967,10 @@ def room_scene( arg = '' ):
         print( '[?] Effect: Removes the specified amount of the given item.' )
         print( '[?] Syntax: $ set <x> <y> <block>' )
         print( '[?] Effect: Replaces the block at (x, y) relative to the player.' )
+        print( '[?] Syntax: $ fight <monster id>' )
+        print( '[?] Effect: Triggers a fight with the supplied monster ID.' )
+        print( '[?] Syntax: $ execute <code>' )
+        print( '[?] Effect: Sends code to the Python interpreter.' )
       else:
         print( f'[#] Unknown command "{ p[2:] }".' )
 
@@ -1149,7 +1175,7 @@ def room_scene( arg = '' ):
           goto_room( room_scene )
 
       # Set block
-      if p[2:] == 'set':
+      elif p[2:] == 'set':
         print( '[#] Must supply coordinates.' )
 
       elif p[2:6] == 'set ':
@@ -1175,6 +1201,30 @@ def room_scene( arg = '' ):
             data_world_update( g_wname )
             print( f"[!] Set block to ID '{ p_def[ 6: ].split( ' ' )[2] }'" )
             goto_room( room_scene )
+
+      # Fight monster
+      elif p[2:] == 'fight':
+        print( '[#] Must supply monster ID.' )
+
+      elif p[2:8] == 'fight ':
+
+        # Check monster ID
+        if p[8:] not in MONSTERS:
+          print( '[#] Invalid monster ID.' )
+
+        else:
+
+          if p[8:] == 'slime': g_monster = MonsterSlime()
+
+          goto_room( room_fight )
+
+      # Execute code
+      elif p[2:] == 'execute':
+        print( '[#] Must supply code.' )
+
+      elif p[2:10] == 'execute ':
+
+        exec( p[10:] )
 
       # Invalid input
       else:
@@ -1687,10 +1737,43 @@ def room_crafting( arg = '' ):
 
     # Invalid input
     else:
-      print( '[#] Unknown command.')
+      print( '[#] Unknown command.' )
+
+def room_fight( arg = "" ):
+
+  global g_monster
+
+  # Args can be set to 1 to avoid re-printing room data
+  if not ( len( arg ) > 0 and arg[0] == '1' ):
+    print( f'{ g_monster.name }: { g_monster.hp } HP' )
+    print()
+    print( '[*] Pause' )
+
+  # Get inputs
+  while True:
+    p = input( '> ' )
+
+    # Pause
+    if p == '*':
+      goto_room( room_pause, 'goto_room( room_fight )' )
+
+    # Invalid input
+    else:
+      print( '[#] Unknown command.' )
+
+    goto_room( room_fight )
+
+def room_death():
+
+  for c in 'You were slain...':
+    print( c, end = '' )
+    time.sleep( 0.1 )
+  print()
+
+  goto_room( room_scene )
 
 # Pause room
-def room_pause():
+def room_pause( arg = '' ):
 
   # Show options
   print_line()
@@ -1708,7 +1791,10 @@ def room_pause():
     # Unpause
     elif p == 'x':
       print( '[!] Returned to game.')
-      goto_room( room_scene )
+      if arg == '':
+        goto_room( room_scene )
+      else:
+        exec( arg )
 
     # Invalid input
     else:
