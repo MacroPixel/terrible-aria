@@ -131,16 +131,625 @@ class Monster:
     self.hp = 1
     self.name = 'MISSING'
 
-  def damage( self, amount ):
+  # Deals damage to self, allowing a random range and multiplier to be used
+  def damage( self, a, b = 'NONE', m = 1, entity = 'self' ):
 
-    self.hp -= amount
+    global g_hp
+
+    if b == 'NONE':
+      amount = a
+    else:
+      amount = random.randint( a, b )
+
+    # m (multiplier) is used for stronger weapons/armor
+    amount *= m
+    if entity == 'self':
+      self.hp -= amount
+    else:
+      g_hp -= amount
+    return amount
+
+  # Checks if either entity has died
+  def hp_check( self ):
+
+    if self.hp <= 0:
+      print_line()
+      print( f'[!] { self.name } was killed.' )
+      input( '[!] Press enter to exit the fight. ' )
+      goto_room( room_scene )
+
+    if g_hp <= 0:
+      print_line()
+      print( f'[!] { self.name } won.' )
+      input( '[!] Press enter to exit the fight. ' )
+      goto_room( room_death )
 
 class MonsterSlime( Monster ):
 
   def __init__( self ):
 
-    self.hp = 20
+    self.hp = 50
     self.name = 'Slime'
+
+    self.attack = random.choice( ( 0, 1 ) )
+
+  def get_options( self, player_turn, should_print = True ):
+
+    # Player offensive
+    if player_turn:
+      print( '[S] Swing sword' )
+      print( '[F] Shoot forward' )
+      print( '[U] Shoot upward' )
+      return ( 's', 'f', 'u' )
+
+    # Player defensive
+    else:
+      print( '[B] Move backward' )
+      print( '[F] Move forward' )
+      print( '[S] Stay stationary' )
+      return ( 'b', 'f', 's' )
+
+  # They player's turn is defined here because it depends on the monster's behavior
+  def player_turn( self, p ):
+
+    # Swing sword
+    if p == 's':
+
+      if self.attack == 0: # Jump
+        print( '[!] The enemy jumped over your sword.' )
+        print( '[*] Enemy: NO DAMAGE' )
+      if self.attack == 1: # Sit
+        print( '[!] You attacked the enemy.' )
+        print( f'[*] Enemy: -{ self.damage( 12, 24 ) } HP' )
+
+    # Shoot forward
+    elif p == 'f':
+
+      if self.attack == 0: # Jump
+        print( '[!] The enemy jumped over your arrow.' )
+        print( '[*] Enemy: NO DAMAGE' )
+      if self.attack == 1: # Sit
+        print( '[!] The enemy stayed stationary and was hit by your arrow.' )
+        print( f'[*] Enemy: -{ self.damage( 8, 16 ) } HP' )
+
+    # Shoot upward
+    elif p == 'u':
+
+      if self.attack == 0: # Jump
+        print( '[!] The enemy jumped into your arrow.' )
+        print( f'[*] Enemy: -{ self.damage( 8, 16 ) } HP' )
+      if self.attack == 1: # Sit
+        print( '[!] The enemy stayed stationary, so your arrow missed.' )
+        print( '[*] Enemy: NO DAMAGE' )
+
+    # Check if either entity died
+    self.hp_check()
+
+  # The enemy's turn to attack
+  def turn( self, p ):
+    
+    # Move backward/forward
+    if p == 'b' or p == 'f':
+
+      # Leap
+      print( '[!] The enemy leaped onto you, but you moved out of the way.' )
+      print( '[*] You: NO DAMAGE' )
+
+    # Stay still
+    elif p == 's':
+
+      # Leap
+      print( '[!] The enemy leaped onto you.' )
+      print( f'[*] You: -{ self.damage( 8, 20, entity = "you" ) } HP' )
+
+    # Check if either entity died
+    self.hp_check()
+
+    # Progress attack
+    self.attack = 1 - self.attack
+
+class MonsterZombie( Monster ):
+
+  def __init__( self ):
+
+    self.hp = 90
+    self.name = 'Zombie'
+
+    self.attack = random.choice( ( 0, 1 ) )
+    self.attack_c = 1 if self.attack == 0 else 0
+
+  def get_options( self, player_turn, should_print = True ):
+
+    # Player offensive
+    if player_turn:
+      print( '[S] Swing sword' )
+      print( '[F] Shoot forward' )
+      print( '[U] Shoot upward' )
+      return ( 's', 'f', 'u' )
+
+    # Player defensive
+    else:
+      print( '[B] Move backward' )
+      print( '[F] Move forward' )
+      print( '[J] Jump' )
+      return ( 'b', 'f', 'j' )
+
+  # They player's turn is defined here because it depends on the monster's behavior
+  def player_turn( self, p ):
+
+    # Swing sword
+    if p == 's':
+
+      if self.attack == 0: # Jump
+        print( '[!] The enemy jumped over your sword.' )
+        print( f'[*] Enemy: NO DAMAGE' )
+      if self.attack == 1: # Move back
+        print( '[!] The enemy moved backward, but was still hit by your sword.' )
+        print( f'[*] Enemy: -{ self.damage( 12, 24 ) } HP' )
+
+    # Shoot forward
+    elif p == 'f':
+
+      if self.attack == 0: # Jump
+        print( '[!] The enemy jumped over your arrow.' )
+        print( '[*] Enemy: NO DAMAGE' )
+      if self.attack == 1: # Move back
+        print( '[!] The enemy moved backward, but was still hit by your arrow.' )
+        print( f'[*] Enemy: -{ self.damage( 8, 16 ) } HP' )
+
+    # Shoot upward
+    elif p == 'u':
+
+      if self.attack == 0: # Jump
+        print( '[!] The enemy jumped into your arrow.' )
+        print( f'[*] Enemy: -{ self.damage( 8, 16 ) } HP' )
+      if self.attack == 1: # Move back
+        print( '[!] The enemy moved backward, so your arrow missed.' )
+        print( '[*] Enemy: NO DAMAGE' )
+
+    # Check if either entity died
+    self.hp_check()
+
+    # Progress attack
+    self.attack_c += 1
+    if self.attack_c % 3 == 0:
+      self.attack = 1 - self.attack
+
+  # The enemy's turn to attack
+  def turn( self, p ):
+    
+    # Move backward
+    if p == 'b':
+
+      if self.attack == 0: # Jump
+        print( '[!] You moved backward, and the enemy jumped into you.' )
+        print( f'[*] You: -{ self.damage( 12, 20, entity = "you" ) } HP' )
+      if self.attack == 1: # Arm
+        print( '[!] The enemy swung its arm, but you moved out of its reach.' )
+        print( '[*] You: NO DAMAGE' )
+
+    # Move forward
+    elif p == 'f':
+
+      if self.attack == 0: # Jump
+        print( '[!] You run past the enemy while it was jumping.' )
+        print( '[*] You: NO DAMAGE' )
+      if self.attack == 1: # Arm
+        print( '[!] The enemy swing its arm, and you walked into it.' )
+        print( f'[*] You: -{ self.damage( 6, 12, entity = "you" ) } HP' )
+
+    # Jump
+    elif p == 'j':
+
+      if self.attack == 0: # Jump
+        print( '[!] You and the enemy both jumped forward.' )
+        print( f'[*] You: -{ self.damage( 10, 16, entity = "you" ) } HP' )
+      if self.attack == 1: # Arm
+        print( '[!] The enemy swung its arm, and you jumped over it.' )
+        print( '[*] You: NO DAMAGE' )
+
+    # Check if either entity died
+    self.hp_check()
+
+    # Progress attack
+    self.attack_c += 1
+    if self.attack_c % 3 == 0:
+      self.attack = 1 - self.attack
+
+class MonsterDemonEye( Monster ):
+
+  def __init__( self ):
+
+    self.hp = 70
+    self.name = 'Demon Eye'
+
+    self.attack = random.choice( ( 0, 1 ) )
+    self.attack_c = 0
+    self.attack_0 = self.attack
+
+  def get_options( self, player_turn, should_print = True ):
+
+    # Player offensive
+    if player_turn:
+      print( '[S] Jump and swing sword (*)' )
+      print( '[R] Shoot rightward' )
+      print( '[L] Shoot leftward' )
+      return ( 's', 'r', 'l' )
+
+    # Player defensive
+    else:
+      print( '[B] Move backward' )
+      print( '[R] Move rightward' )
+      print( '[L] Move leftward' )
+      print( '[J] Jump (*)' )
+      return ( 'b', 'r', 'l', 'j' )
+
+  # They player's turn is defined here because it depends on the monster's behavior
+  def player_turn( self, p ):
+
+    # Jump and swing sword
+    if p == 's':
+
+      # Random chance
+      if random.choice( ( True, False ) ):
+        print( '[!] You jumped and hit the enemy with your sword.' )
+        print( f'[*] Enemy: -{ self.damage( 12, 24 ) } HP' )
+      else:
+        print( '[!] You jumped, but barely missed the enemy.' )
+        print( '[*] Enemy: NO DAMAGE' )
+
+    # Shoot rightward
+    elif p == 'r':
+
+      if self.attack == 0: # Fly right
+        print( '[!] The enemy flew rightward and was hit by your arrow.' )
+        print( f'[*] Enemy: -{ self.damage( 8, 16 ) } HP' )
+      if self.attack == 1: # Fly left
+        print( '[!] The enemy flew leftward, so you arrow missed.' )
+        print( '[*] Enemy: NO DAMAGE' )
+
+    # Shoot leftward
+    elif p == 'l':
+
+      if self.attack == 0: # Fly right
+        print( '[!] The enemy flew rightward, so your arrow missed.' )
+        print( '[*] Enemy: NO DAMAGE' )
+      if self.attack == 1: # Fly left
+        print( '[!] The enemy flew leftward and was hit by your arrow.' )
+        print( f'[*] Enemy: -{ self.damage( 8, 16 ) } HP' )
+
+    # Check if either entity died
+    self.hp_check()
+
+    # Progress attack
+    self.attack_c += 1
+    self.attack = ( self.attack_0 ) if ( self.attack_c % 6 in ( 0, 2, 3 ) ) else ( 1 - self.attack_0 )
+
+  # The enemy's turn to attack
+  def turn( self, p ):
+    
+    # Move backward
+    if p == 'b':
+
+      if self.attack == 0: # From front
+        print( '[!] You moved backward, and the enemy flew into you.' )
+        print( f'[*] You: -{ self.damage( 10, 18, entity = "you" ) } HP' )
+      if self.attack == 1: # From side
+        print( '[!] The enemy flew in from the side, and you dodged its attack.' )
+        print( '[*] You: NO DAMAGE' )
+
+    # Move rightward
+    elif p == 'r':
+
+      if self.attack == 0: # From front
+        print( '[!] The enemy flew in from the front, and you dodged its attack.' )
+        print( '[*] You: NO DAMAGE' )
+      if self.attack == 1: # From side
+        print( '[!] You moved rightward, and the enemy flew into you.' )
+        print( f'[*] You: -{ self.damage( 10, 18, entity = "you" ) } HP' )
+
+    # Move leftward
+    elif p == 'l':
+
+      if self.attack == 0: # From front
+        print( '[!] The enemy flew in from the front, and you dodged its attack.' )
+        print( '[*] You: NO DAMAGE' )
+      if self.attack == 1: # From side
+        print( '[!] You moved leftward, and the enemy flew into you.' )
+        print( f'[*] You: -{ self.damage( 10, 18, entity = "you" ) } HP' )
+
+    # Jump
+    elif p == 'j':
+
+      # Random chance
+      if random.choice( ( True, False ) ):
+        print( f'[!] The enemy flew in from the { "front" if self.attack == 0 else "side" }, and you jumped over it.' )
+        print( '[*] You: NO DAMAGE' )
+      else:
+        print( f'[!] The enemy flew in from the { "front" if self.attack == 0 else "side" }, and you didn\'t jump over it in time.' )
+        print( f'[*] You: -{ self.damage( 10, 18, entity = "you" ) } HP' )
+
+    # Check if either entity died
+    self.hp_check()
+
+    # Progress attack
+    self.attack_c += 1
+    self.attack = ( self.attack_0 ) if ( self.attack_c % 6 in ( 0, 2, 3 ) ) else ( 1 - self.attack_0 )
+
+class MonsterCaveBat( Monster ):
+
+  def __init__( self ):
+
+    self.hp = 40
+    self.name = 'Cave Bat'
+
+    self.attack = random.choice( ( 0, 1, 2 ) )
+    self.attack_c = self.attack
+    self.attack_0 = self.attack
+
+  def get_options( self, player_turn, should_print = True ):
+
+    # Player offensive
+    if player_turn:
+      print( '[S] Jump and swing sword' )
+      print( '[F] Shoot forward' )
+      print( '[R] Shoot rightward' )
+      return ( 's', 'f', 'r' )
+
+    # Player defensive
+    else:
+      print( '[J] Jump' )
+      print( '[S] Stay stationary' )
+      return ( 'j', 's' )
+
+  # They player's turn is defined here because it depends on the monster's behavior
+  def player_turn( self, p ):
+
+    # Jump and swing sword
+    if p == 's':
+
+      if self.attack == 0: # Hover
+        print( '[!] The enemy didn\'t move, so you jumped and hit it with your sword.' )
+        print( f'[*] Enemy: -{ self.damage( 12, 24 ) } HP' )
+      if self.attack == 1: # Fly sideways
+        print( '[!] You jumped towards the enemy, but it flew sideways.' )
+        print( '[*] Enemy: NO DAMAGE' )
+      if self.attack == 2: # Fly upward
+        print( '[!] You jumped towards the enemy, but it flew further away.' )
+        print( '[*] Enemy: NO DAMAGE' )
+
+    # Shoot forward
+    elif p == 'f':
+
+      if self.attack == 0: # Hover
+        print( '[!] The enemy didn\'t move, so your arrow hit it.' )
+        print( f'[*] Enemy: -{ self.damage( 8, 16 ) } HP' )
+      if self.attack == 1: # Fly sideways
+        print( '[!] You shot at the enemy, but it flew sideways.' )
+        print( '[*] Enemy: NO DAMAGE' )
+      if self.attack == 2: # Fly upward
+        print( '[!] The enemy flew further away, but was still hit by your arrow.' )
+        print( f'[*] Enemy: -{ self.damage( 8, 16 ) } HP' )
+
+    # Shoot rightward
+    elif p == 'r':
+
+      if self.attack == 0: # Hover
+        print( '[!] The enemy didn\'t move, so your arrow flew to its right.' )
+        print( '[*] Enemy: NO DAMAGE' )
+      if self.attack == 1: # Fly sideways
+        print( '[!] The enemy flew rightward into your arrow.' )
+        print( f'[*] Enemy: -{ self.damage( 8, 16 ) } HP' )
+      if self.attack == 2: # Fly upward
+        print( '[!] The enemy flew further away, and your arrow flew to its right.' )
+        print( '[*] Enemy: NO DAMAGE' )
+
+    # Check if either entity died
+    self.hp_check()
+
+    # Progress attack
+    self.attack_c += ( 1 if self.attack_0 != 1 else -1 )
+    self.attack = self.attack_c % 3
+
+  # The enemy's turn to attack
+  def turn( self, p ):
+    
+    # Jump
+    if p == 'j':
+
+      if self.attack == 0: # Missed
+        print( '[!] The enemy flew towards you, but it missed.' )
+        print( '[*] You: NO DAMAGE' )
+      if self.attack == 1: # Low attack
+        print( '[!] You jumped, and the enemy flew under you.' )
+        print( '[*] You: NO DAMAGE' )
+      if self.attack == 2: # High attack
+        print( '[!] The enemy flew over you, and you jumped into it.' )
+        print( f'[*] You: -{ self.damage( 10, 18, entity = "you" ) } HP' )
+
+    # Stay stationary
+    elif p == 's':
+
+      if self.attack == 0: # Missed
+        print( '[!] The enemy flew towards you, but it missed.' )
+        print( '[*] You: NO DAMAGE' )
+      if self.attack == 1: # Low attack
+        print( '[!] The enemy flew into you.' )
+        print( f'[*] You: -{ self.damage( 10, 18, entity = "you" ) } HP' )
+      if self.attack == 2: # High attack
+        print( '[!] The enemy flew over you.' )
+        print( '[*] You: NO DAMAGE' )
+
+    # Check if either entity died
+    self.hp_check()
+
+    # Progress attack
+    self.attack_c += ( 1 if self.attack_0 != 1 else -1 )
+    self.attack = self.attack_c % 3
+
+class MonsterSkeleton( Monster ):
+
+  def __init__( self ):
+
+    self.hp = 120
+    self.name = 'Skeleton'
+
+    self.attack = random.choice( ( 0, 1, 2, 3 ) )
+    self.attack_c = 0
+    self.attack_0 = self.attack
+
+  def get_options( self, player_turn, should_print = True ):
+
+    # Player offensive
+    if player_turn:
+      print( '[S] Swing sword (*)' )
+      print( '[J] Jump and swing sword' )
+      print( '[U] Shoot upward' )
+      print( '[R] Shoot rightward' )
+      print( '[L] Shoot leftward' )
+      return ( 's', 'j', 'u', 'r', 'l' )
+
+    # Player defensive
+    else:
+      print( '[J] Jump' )
+      print( '[B] Move backward' )
+      return ( 'j', 'b' )
+
+  # They player's turn is defined here because it depends on the monster's behavior
+  def player_turn( self, p ):
+
+    # Swing sword
+    if p == 's':
+
+      if self.attack == 0: # Deflect
+        print( '[!] You swung your sword at the enemy, but it absorbed your attack.' )
+        print( '[*] Enemy: NO DAMAGE' )
+      if self.attack == 1: # Jump
+        if random.choice( ( True, False ) ):
+          print( '[!] The enemy was about to jump, but you hit it with your sword.' )
+          print( f'[*] Enemy: -{ self.damage( 12, 24 ) } HP' )
+        else:
+          print( '[!] You swung your sword at the enemy, but it jumped over it.' )
+          print( '[*] Enemy: NO DAMAGE' )
+      if self.attack == 2: # Move rightward
+        print( '[!] You swung your sword at the enemy, but it moved rightward.' )
+        print( '[*] Enemy: NO DAMAGE' )
+      if self.attack == 3: # Move leftward
+        print( '[!] You swung your sword at the enemy, but it moved leftward.' )
+        print( '[*] Enemy: NO DAMAGE' )
+
+    # Jump and swing sword
+    if p == 'j':
+
+      if self.attack == 0: # Deflect
+        print( '[!] The enemy remained stationary, so you jumped over it.' )
+        print( '[*] Enemy: NO DAMAGE' )
+      if self.attack == 1: # Jump
+        print( '[!] The enemy jumped, so you jumped and hit it with your sword.' )
+        print( f'[*] Enemy: -{ self.damage( 16, 28 ) } HP' )
+      if self.attack == 2: # Move rightward
+        print( '[!] You jumped and swung, but the enemy dodged rightward.' )
+        print( '[*] Enemy: NO DAMAGE' )
+      if self.attack == 3: # Move leftward
+        print( '[!] You jumped and swung, but the enemy dodged leftward.' )
+        print( '[*] Enemy: NO DAMAGE' )
+
+    # Shoot upward
+    if p == 'u':
+
+      if self.attack == 0: # Deflect
+        print( '[!] The enemy remained stationary, so your arrow missed it.' )
+        print( '[*] Enemy: NO DAMAGE' )
+      if self.attack == 1: # Jump
+        print( '[!] The enemy jumped and was hit by your arrow.' )
+        print( f'[*] Enemy: -{ self.damage( 8, 16 ) } HP' )
+      if self.attack == 2: # Move rightward
+        print( '[!] You shot your arrow upward, but the enemy moved rightward.' )
+        print( '[*] Enemy: NO DAMAGE' )
+      if self.attack == 3: # Move leftward
+        print( '[!] You shot your arrow upward, but the enemy moved leftward.' )
+        print( '[*] Enemy: NO DAMAGE' )
+
+    # Shoot rightward
+    if p == 'r':
+
+      if self.attack == 0: # Deflect
+        print( '[!] The enemy remained stationary, so your arrow missed it.' )
+        print( '[*] Enemy: NO DAMAGE' )
+      if self.attack == 1: # Jump
+        print( '[!] You shot your arrow rightward, but the enemy jumped.' )
+        print( '[*] Enemy: NO DAMAGE' )
+      if self.attack == 2: # Move rightward
+        print( '[!] The enemy moved rightward into your arrow.' )
+        print( f'[*] Enemy: -{ self.damage( 8, 16 ) } HP' )
+      if self.attack == 3: # Move leftward
+        print( '[!] You shot your arrow rightward, but the enemy moved leftward.' )
+        print( '[*] Enemy: NO DAMAGE' )
+
+    # Shoot leftward
+    if p == 'l':
+
+      if self.attack == 0: # Deflect
+        print( '[!] The enemy remained stationary, so your arrow missed it.' )
+        print( '[*] Enemy: NO DAMAGE' )
+      if self.attack == 1: # Jump
+        print( '[!] You shot your arrow leftward, but the enemy jumped.' )
+        print( '[*] Enemy: NO DAMAGE' )
+      if self.attack == 2: # Move rightward
+        print( '[!] You shot your arrow leftward, but the enemy moved rightward.' )
+        print( '[*] Enemy: NO DAMAGE' )
+      if self.attack == 3: # Move leftward
+        print( '[!] The enemy moved leftward into your arrow.' )
+        print( f'[*] Enemy: -{ self.damage( 8, 16 ) } HP' )
+
+    # Check if either entity died
+    self.hp_check()
+
+    # Progress attack
+    self.attack_c += 1
+    self.attack = ( ( 0, 1, 2, 3, 2, 1 )[ self.attack_c % 6 ] + self.attack_0 ) % 4
+
+  # The enemy's turn to attack
+  def turn( self, p ):
+    
+    # Jump
+    if p == 'j':
+
+      if self.attack == 0: # Charge toward
+        print( '[!] The enemy charged toward you, and you jumped over it.' )
+        print( '[*] You: NO DAMAGE' )
+      if self.attack == 1: # Jump on
+        print( '[!] You and the enemy both jumped towards each other.' )
+        print( f'[*] You: -{ self.damage( 18, 28, entity = "you" ) } HP' )
+      if self.attack == 2: # Throw bone
+        print( '[!] The enemy threw a bone at you, and you jumped over it.' )
+        print( '[*] You: NO DAMAGE' )
+      if self.attack == 3: # Throw bone upward
+        print( '[!] The enemy threw a bone upward, and you jumped into it.' )
+        print( f'[*] You: -{ self.damage( 8, 18, entity = "you" ) } HP' )
+    
+    # Move backward
+    if p == 'b':
+
+      if self.attack == 0: # Charge toward
+        print( '[!] The enemy charged toward you, and you didn\t back up far enough.' )
+        print( f'[*] You: -{ self.damage( 20, 40, entity = "you" ) } HP' )
+      if self.attack == 1: # Jump on
+        print( '[!] The enemy tried to jump on you, but you moved backwards.' )
+        print( '[*] You: NO DAMAGE' )
+      if self.attack == 2: # Throw bone
+        print( '[!] The enemy threw a bone, and it hit you.' )
+        print( f'[*] You: -{ self.damage( 8, 18, entity = "you" ) } HP' )
+      if self.attack == 3: # Throw bone upward
+        print( '[!] The enemy threw a bone upward, and it missed you.' )
+        print( '[*] You: NO DAMAGE' )
+
+    # Check if either entity died
+    self.hp_check()
+
+    # Progress attack
+    self.attack_c += 1
+    self.attack = ( ( 0, 1, 2, 3, 2, 1 )[ self.attack_c % 6 ] + self.attack_0 ) % 4
 
 # Switches rooms
 def goto_room( room, arg = '' ):
@@ -177,9 +786,7 @@ def noise_top( x, seed ):
   random.seed( next_seed )
   return s / 4;
 
-# GLOBAL CONSTANTS
-DEBUG = True
-SHOW_PROG = False
+# ITEM CONSTANTS
 I_NULL = 0
 I_C_SSWORD = 1
 I_C_PICK = 2
@@ -192,6 +799,23 @@ I_GOLD_ORE = 8
 I_IRON_BAR = 9
 I_SILVER_BAR = 10
 I_GOLD_BAR = 11
+I_W_SWORD = 12
+I_I_SWORD = 13
+I_S_SWORD = 14
+I_G_SWORD = 15
+I_W_BOW = 16
+I_I_BOW = 17
+I_S_BOW = 18
+I_G_BOW = 19
+I_TORCH = 20
+I_ARROW = 21
+I_F_ARROW = 22
+I_PLATFORM = 23
+I_CHEST = 24
+I_ACORN = 25
+I_GRENADE = 26
+I_BOMB = 27
+
 ITEM_META = [
   [ 'NULL', 'An item you shouldn\'t have' ],
   [ 'Copper Shortsword', 'Better than nothing!' ],
@@ -204,11 +828,31 @@ ITEM_META = [
   [ 'Gold Ore', 'An ore.' ],
   [ 'Iron Bar', 'A bar.' ],
   [ 'Silver Bar', 'A bar.' ],
-  [ 'Gold Bar', 'A bar.' ]
+  [ 'Gold Bar', 'A bar.' ],
+  [ 'Wooden Sword', 'Description' ],
+  [ 'Iron Sword', 'Description' ],
+  [ 'Silver Sword', 'Description' ],
+  [ 'Golden Sword', 'Description' ],
+  [ 'Wooden Bow', 'Description' ],
+  [ 'Iron Bow', 'Description' ],
+  [ 'Silver Bow', 'Description' ],
+  [ 'Golden Bow', 'Description' ],
+  [ 'Torch', 'Description' ],
+  [ 'Arrow', 'Description' ],
+  [ 'Flaming Arrow', 'Description' ],
+  [ 'Wooden Platform', 'Description' ],
+  [ 'Chest', 'Description' ],
+  [ 'Acorn', 'Description' ],
+  [ 'Grenade', 'Description' ],
+  [ 'Bomb', 'Description' ]
 ]
+
+# GLOBAL CONSTANTS
+DEBUG = True
+SHOW_PROG = False
 AIR_BLOCKS = [ ' ', 'l', 'L' ]
 ITEM_BLOCKS = { 'g': I_GRASS, 's': I_STONE, 'w': I_WOOD, 'i': I_IRON_ORE, 'S': I_SILVER_ORE, 'G': I_GOLD_ORE }
-MONSTERS = { 'slime' }
+MONSTERS = [ 'slime', 'zombie', 'demon_eye', 'cave_bat' ]
 
 # GLOBAL VARIABLES
 g_data = {}
@@ -880,12 +1524,13 @@ def room_scene( arg = '' ):
     # Display world
     # (The code to do this is surprisingly short, eh?)
     for j in range( g_view.y, g_view.y + 41 ):
+      t = ''
       for i in range( g_view.x, g_view.x + 61 ):
         if i == g_pos.x and j == g_pos.y:
-          print( g_tmap[ 'player' ], end = ' ' )
+          t += g_tmap[ 'player' ] + ' '
         else:
-          print( char2tile( g_tile_data[ xy2c( i, j, g_world_size.x ) ] ), end = " " )
-      print()
+          t += char2tile( g_tile_data[ xy2c( i, j, g_world_size.x ) ] ) + ' '
+      print( t )
 
     # Show help options if loaded in for first time
     if g_show_help:
@@ -1066,13 +1711,13 @@ def room_scene( arg = '' ):
     elif p[:2] == 's ':
 
       # Make sure it matches a slot
-      if p[2:] not in list( '1234567890ABCDEF' ):
+      if p[2:] not in list( '1234567890abcdef' ):
         print( '[#] Enter a number from 0-9 or a letter from A-F.' )
 
       else:
 
         # Select slot
-        g_slot = list( '1234567890ABCDEF' ).index( p[2:] )
+        g_slot = list( '1234567890abcdef' ).index( p[2:] )
         print( f'[!] Selected "{ item_meta( g_slot, c = 1 ) }".' if g_items[ g_slot ][1] > 0 else '[!] Cleared selection.' )
         goto_room( room_scene )
 
@@ -1211,12 +1856,8 @@ def room_scene( arg = '' ):
         # Check monster ID
         if p[8:] not in MONSTERS:
           print( '[#] Invalid monster ID.' )
-
         else:
-
-          if p[8:] == 'slime': g_monster = MonsterSlime()
-
-          goto_room( room_fight )
+          start_fight( p[8:] )
 
       # Execute code
       elif p[2:] == 'execute':
@@ -1450,7 +2091,7 @@ def room_inventory( arg = "" ):
     for i in range( 16 ):
       j = i // 2 + ( i % 2 ) * 8
       t = f"({ '1234567890ABCDEF'[j] }) "
-      t += f"{ item_meta( j, c = 1 ) if g_items[j][1] != 0 else '...' }"
+      t += ( '* ' if g_slot == j else '' ) + ( item_meta( j, c = 1 ) if g_items[j][1] != 0 else '...' )
       t += f"  x{ g_items[j][1] }" if g_items[j][1] != 0 else ''
       t = t[:38]
       print( t + ' ' * ( 40 - len( t ) ), end = ( '' if j < 8 else '\n' ) )
@@ -1598,7 +2239,14 @@ def room_crafting( arg = '' ):
     { 'req': { I_IRON_ORE: 3 }, 'res': [ I_IRON_BAR, 1 ] },
     { 'req': { I_SILVER_ORE: 3 }, 'res': [ I_SILVER_BAR, 1 ] },
     { 'req': { I_GOLD_ORE: 3 }, 'res': [ I_GOLD_BAR, 1 ] },
-    { 'req': { I_IRON_ORE: 3, I_SILVER_ORE: 4, I_GOLD_ORE: 5 }, 'res': [ I_GRASS, 1 ] }
+    { 'req': { I_WOOD: 20 }, 'res': [ I_W_SWORD, 1 ] },
+    { 'req': { I_WOOD: 8, I_IRON_BAR: 8 }, 'res': [ I_I_SWORD, 1 ] },
+    { 'req': { I_WOOD: 8, I_SILVER_BAR: 8 }, 'res': [ I_S_SWORD, 1 ] },
+    { 'req': { I_WOOD: 8, I_GOLD_BAR: 8 }, 'res': [ I_G_SWORD, 1 ] },
+    { 'req': { I_WOOD: 12 }, 'res': [ I_W_BOW, 1 ] },
+    { 'req': { I_IRON_BAR: 6 }, 'res': [ I_I_BOW, 1 ] },
+    { 'req': { I_SILVER_BAR: 6 }, 'res': [ I_S_BOW, 1 ] },
+    { 'req': { I_GOLD_BAR: 6 }, 'res': [ I_G_BOW, 1 ] }
   ]
 
   # Try extracting page from argument
@@ -1612,6 +2260,7 @@ def room_crafting( arg = '' ):
     print( 'Crafting:' )
     for i in range( page * 8, min( page * 8 + 8, len( RECIPES ) ) ):
       print( f"({ i % 8 + 1 }) { item_meta( RECIPES[ i ][ 'res' ][ 0 ] ) }  x{ RECIPES[ i ][ 'res' ][ 1 ] }" )
+    print( f'(Page { page + 1 }/{ len( RECIPES ) // 8 + 1 })' )
     print()
     if page > 0:
       print( '[P] Previous Page' )
@@ -1661,75 +2310,77 @@ def room_crafting( arg = '' ):
           if not ( 0 <= p - 1 < ( min( page * 8 + 8, len( RECIPES ) ) - ( page * 8 ) ) ):
             print( '[#] Invalid slot ID.' )
           else:
+            break
+      
+      # Show ingredients
+      if t == 'i':
 
-            # Show ingredients
-            if t == 'i':
+        t = page * 8 + ( p - 1 ) # Shortening selected slot
+  
+        # Print data
+        print( f"Required ingredients for \"{ item_meta( RECIPES[t]['res'][0] ) }\":" )
+        for i in RECIPES[t]['req']:
+          print( f"- { item_meta( i ) } x{ RECIPES[t]['req'][i] }" )
+  
+        # Reload room
+        goto_room( room_crafting, '1' + str( page ) )
 
-              t = page * 8 + ( p - 1 ) # Shortening selected slot
+      # Alternatively, craft the item
+      elif t == 'c':
 
-              # Print data
-              print( f"Required ingredients for \"{ item_meta( RECIPES[t]['res'][0] ) }\":" )
-              for i in RECIPES[t]['req']:
-                print( f"- \"{ item_meta( i ) }\" x{ RECIPES[t]['req'][i] }" )
+        t = page * 8 + ( p - 1 ) # Shortening selected slot
 
-              # Reload room
+        # Get the quantity
+        print( 'Enter the number of times you want to craft it:' )
+        while True:
+          p = input( '> ' )
+
+          # Attempt cast
+          try:
+            p = int( p )
+          except ValueError:
+            print( '[#] Enter a number.' )
+          else:
+
+            # Test range
+            if p == 0:
+              print( '[!] Canceled crafting.' )
               goto_room( room_crafting, '1' + str( page ) )
 
-            # Alternatively, craft the item
-            elif t == 'c':
-
-              t = page * 8 + ( p - 1 ) # Shortening selected slot
-
-              # Get the quantity
-              print( 'Enter the number of times you want to craft it:' )
-              while True:
-                p = input( '> ' )
-
-                # Attempt cast
-                try:
-                  p = int( p )
-                except ValueError:
-                  print( '[#] Enter a number.' )
-                else:
-
-                  # Test range
-                  if p == 0:
-                    print( '[!] Canceled crafting.' )
-                    goto_room( room_crafting, '1' + str( page ) )
-
-                  elif not ( 0 < p <= 2048 ):
-                    print( '[#] Out of range.' )
-
-                  else:
-
-                    can_craft = True
-
-                    # Iterate through required materials, seeing which are missing
-                    for i in RECIPES[t]['req']:
-                      if update_inv( i, 0, mode = 't' ) < RECIPES[t]['req'][i] * p:
-                        can_craft = False
-                        print( f"[#] You need { RECIPES[t]['req'][i] * p - update_inv( i, 0, mode = 't' ) } more \"{ item_meta( i ) }\"." )
-
-                    # Continue onward if they have all the items
-                    if can_craft:
-
-                      # Take the ingredients, then give them the resultant item
-                      for i in RECIPES[t]['req']:
-                        update_inv( i, RECIPES[t]['req'][i] * p, mode = 'r' )
-                      update_inv( RECIPES[t]['res'][0], RECIPES[t]['res'][1] * p, mode = 'p' )
-
-                      print( f"[!] You crafted \"{ item_meta( RECIPES[t]['res'][0] ) }\" x{ RECIPES[t]['res'][1] * p }." )
-
-                      # Reload room
-                      goto_room( room_crafting, '!' + str( page ) )
-
-                    else:
-
-                      # Reload room
-                      goto_room( room_crafting, '1' + str( page ) )
+            elif not ( 0 < p <= 2048 ):
+              print( '[#] Out of range.' )
 
             else:
-              print( 'This will never happen.' )
+              break
+
+        can_craft = True
+
+        # Iterate through required materials, seeing which are missing
+        for i in RECIPES[t]['req']:
+          if update_inv( i, 0, mode = 't' ) < RECIPES[t]['req'][i] * p:
+            can_craft = False
+            print( f"[#] You need { RECIPES[t]['req'][i] * p - update_inv( i, 0, mode = 't' ) } more \"{ item_meta( i ) }\"." )
+
+        # Continue onward if they have all the items
+        if can_craft:
+
+          # Take the ingredients, then give them the resultant item
+          for i in RECIPES[t]['req']:
+            update_inv( i, RECIPES[t]['req'][i] * p, mode = 'r' )
+          update_inv( RECIPES[t]['res'][0], RECIPES[t]['res'][1] * p, mode = 'p' )
+
+          print( f"[!] You crafted \"{ item_meta( RECIPES[t]['res'][0] ) }\" x{ RECIPES[t]['res'][1] * p }." )
+
+          # Reload room
+          goto_room( room_crafting, '!' + str( page ) )
+
+        else:
+
+          # Reload room
+          goto_room( room_crafting, '1' + str( page ) )
+
+      else:
+        print( 'This will never happen.' )
 
     # Quit
     elif p == 'q':
@@ -1739,36 +2390,89 @@ def room_crafting( arg = '' ):
     else:
       print( '[#] Unknown command.' )
 
-def room_fight( arg = "" ):
+def start_fight( monster_id ):
+  
+  global g_monster
+  if monster_id == 'slime': g_monster = MonsterSlime()
+  if monster_id == 'zombie': g_monster = MonsterZombie()
+  if monster_id == 'demon_eye': g_monster = MonsterDemonEye()
+  if monster_id == 'cave_bat': g_monster = MonsterCaveBat()
+  else: g_monster = MonsterSlime()
+  
+  print_line()
+  input( f'You encountered a { g_monster.name }! ' )
+  
+  goto_room( room_fight )
+
+def room_fight():
 
   global g_monster
 
-  # Args can be set to 1 to avoid re-printing room data
-  if not ( len( arg ) > 0 and arg[0] == '1' ):
-    print( f'{ g_monster.name }: { g_monster.hp } HP' )
-    print()
-    print( '[*] Pause' )
+  # PLAYER TURN
+  print_line()
+  print( f'You: { g_hp } HP' )
+  print( f'{ g_monster.name }: { g_monster.hp } HP' )
+  allowed_inputs = g_monster.get_options( player_turn = True )
+  print( '[*] Pause' )
 
   # Get inputs
   while True:
-    p = input( '> ' )
+    p = input( '> ' ).lower()
 
     # Pause
     if p == '*':
       goto_room( room_pause, 'goto_room( room_fight )' )
 
+    # Turn
+    elif p in allowed_inputs:
+      g_monster.player_turn( p )
+      break
+
     # Invalid input
     else:
       print( '[#] Unknown command.' )
 
-    goto_room( room_fight )
+  # ENEMY TURN
+  print_line()
+  print( f'You: { g_hp } HP' )
+  print( f'{ g_monster.name }: { g_monster.hp } HP' )
+  allowed_inputs = g_monster.get_options( player_turn = False )
+  print( '[*] Pause' )
+
+  # Get inputs
+  while True:
+    p = input( '> ' ).lower()
+
+    # Pause
+    if p == '*':
+      goto_room( room_pause, 'goto_room( room_fight )' )
+
+    # Turn
+    elif p in allowed_inputs:
+      g_monster.turn( p )
+      break
+
+    # Invalid input
+    else:
+      print( '[#] Unknown command.' )
+
+  goto_room( room_fight )
 
 def room_death():
 
+  print_line()
+  time.sleep( 1 )
   for c in 'You were slain...':
-    print( c, end = '' )
-    time.sleep( 0.1 )
+    print( c, end = '', flush = True )
+    time.sleep( 0.3 )
+
+  time.sleep( 1.5 )
   print()
+  
+  for i in range( 5, 0, -1 ):
+    print( f'Respawning in {i} second{ "s" if i != 1 else "" }.     ', end = '\r' )
+    time.sleep( 1 )
+  print( 'Respawning!' + ' ' * 20 )
 
   goto_room( room_scene )
 
@@ -1785,12 +2489,12 @@ def room_pause( arg = '' ):
 
     # Quit
     if p == 'q':
-      print( '[!] Returned to menu.')
+      print( '[!] Returned to menu.' )
       goto_room( room_menu )
 
     # Unpause
     elif p == 'x':
-      print( '[!] Returned to game.')
+      print( '[!] Returned to game.' )
       if arg == '':
         goto_room( room_scene )
       else:
@@ -1798,7 +2502,7 @@ def room_pause( arg = '' ):
 
     # Invalid input
     else:
-      print( '[#] Unknown command.')
+      print( '[#] Unknown command.' )
 
 #
 # ENTER MAIN LOOP
