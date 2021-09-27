@@ -31,6 +31,16 @@ def item_meta( item_id, component = 0, c = 0 ):
     return ( 'RANGE_ERROR' )
   return ITEM_META[ item_id ][ component ]
 
+# Updates global time since last queried
+def update_playtime():
+
+  global g_play_time, g_play_time_last
+
+  if g_play_time_last == 0:
+    g_play_time_last = time.time()
+  g_play_time += ( time.time() - g_play_time_last )
+  g_play_time_last = time.time()
+
 # Flattens a 2D index [x, y] down to a 1D index [c]
 def xy2c( x, y, w ):
 
@@ -235,8 +245,8 @@ class MonsterSlime( Monster ):
       print( '[!] The enemy leaped onto you, but you moved out of the way.' )
       print( '[*] You: NO DAMAGE' )
 
-    # Stay still
-    elif p == 's':
+    # Stay still (escape default)
+    elif p == 's' or p == '!':
 
       # Leap
       print( '[!] The enemy leaped onto you.' )
@@ -347,6 +357,16 @@ class MonsterZombie( Monster ):
       if self.attack == 1: # Arm
         print( '[!] The enemy swung its arm, and you jumped over it.' )
         print( '[*] You: NO DAMAGE' )
+
+    # Escape
+    elif p == '!':
+
+      if self.attack == 0: # Jump
+        print( '[!] The enemy jumped onto you.' )
+        print( f'[*] You: -{ self.damage( 12, 20, entity = "you" ) } HP' )
+      if self.attack == 1: # Arm
+        print( '[!] The enemy swing its arm at you.' )
+        print( f'[*] You: -{ self.damage( 6, 12, entity = "you" ) } HP' )
 
     # Check if either entity died
     self.hp_check()
@@ -469,6 +489,12 @@ class MonsterDemonEye( Monster ):
         print( f'[!] The enemy flew in from the { "front" if self.attack == 0 else "side" }, and you didn\'t jump over it in time.' )
         print( f'[*] You: -{ self.damage( 10, 18, entity = "you" ) } HP' )
 
+    # Escape
+    elif p == '!':
+
+      print( '[!] The enemy flew into you.' )
+      print( f'[*] You: -{ self.damage( 10, 18, entity = "you" ) } HP' )
+
     # Check if either entity died
     self.hp_check()
 
@@ -567,8 +593,8 @@ class MonsterCaveBat( Monster ):
         print( '[!] The enemy flew over you, and you jumped into it.' )
         print( f'[*] You: -{ self.damage( 10, 18, entity = "you" ) } HP' )
 
-    # Stay stationary
-    elif p == 's':
+    # Stay stationary (Escape default)
+    elif p == 's' or p == '!':
 
       if self.attack == 0: # Missed
         print( '[!] The enemy flew towards you, but it missed.' )
@@ -707,7 +733,7 @@ class MonsterSkeleton( Monster ):
 
     # Progress attack
     self.attack_c += 1
-    self.attack = ( ( 0, 1, 2, 3, 2, 1 )[ self.attack_c % 6 ] + self.attack_0 ) % 4
+    self.attack = ( ( 0, 1, 2, 3, 3, 2, 1 )[ self.attack_c % 7 ] + self.attack_0 ) % 4
 
   # The enemy's turn to attack
   def turn( self, p ):
@@ -744,12 +770,28 @@ class MonsterSkeleton( Monster ):
         print( '[!] The enemy threw a bone upward, and it missed you.' )
         print( '[*] You: NO DAMAGE' )
 
+    # Escape
+    if p == '!':
+
+      if self.attack == 0: # Charge toward
+        print( '[!] The enemy charged toward you.' )
+        print( f'[*] You: -{ self.damage( 20, 40, entity = "you" ) } HP' )
+      if self.attack == 1: # Jump on
+        print( '[!] The enemy jumped on you.' )
+        print( f'[*] You: -{ self.damage( 24, 48, entity = "you" ) } HP' )
+      if self.attack == 2: # Throw bone
+        print( '[!] The enemy threw a bone, and it hit you.' )
+        print( f'[*] You: -{ self.damage( 8, 18, entity = "you" ) } HP' )
+      if self.attack == 3: # Throw bone upward
+        print( '[!] The enemy threw a bone upward, and it missed you.' )
+        print( '[*] You: NO DAMAGE' )
+
     # Check if either entity died
     self.hp_check()
 
     # Progress attack
     self.attack_c += 1
-    self.attack = ( ( 0, 1, 2, 3, 2, 1 )[ self.attack_c % 6 ] + self.attack_0 ) % 4
+    self.attack = ( ( 0, 1, 2, 3, 3, 2, 1 )[ self.attack_c % 7 ] + self.attack_0 ) % 4
 
 # Switches rooms
 def goto_room( room, arg = '' ):
@@ -852,7 +894,7 @@ DEBUG = True
 SHOW_PROG = False
 AIR_BLOCKS = [ ' ', 'l', 'L' ]
 ITEM_BLOCKS = { 'g': I_GRASS, 's': I_STONE, 'w': I_WOOD, 'i': I_IRON_ORE, 'S': I_SILVER_ORE, 'G': I_GOLD_ORE }
-MONSTERS = [ 'slime', 'zombie', 'demon_eye', 'cave_bat' ]
+MONSTERS = [ 'slime', 'zombie', 'demon_eye', 'cave_bat', 'skeleton' ]
 
 # GLOBAL VARIABLES
 g_data = {}
@@ -866,7 +908,10 @@ g_hp = 0
 g_hp_max = 0
 g_items = []
 g_slot = 0
+g_deaths = 0
+g_versions = [ '', '' ]
 g_play_time = 0
+g_play_time_last = 0
 g_tile_data = []
 g_show_help = True
 g_tmap = {
@@ -913,9 +958,10 @@ def data_main_load():
     g_data[ 'world_list' ] = []
 
   # Define the tile map
-  t = file[2][ 8: ].split( ';' )
+  t = file[2][ 8: ].replace( '==', '=__EQUAL__').split( ';' )
   for s in t:
-    g_tmap[ s.split( '=' )[0] ] = ( s.split( '=' )[1] if len( s.split( '=' ) ) != 3 else '=' )
+    if len( s.split( '=' ) ) == 2 and len( s.split( '=' )[1] ) > 0:
+      g_tmap[ s.split( '=' )[0] ] = ( s.split( '=' )[1] if s.split( '=' )[1] != '__EQUAL__' else '=' )
 
 # Write back to the data file if something changed
 def data_main_update():
@@ -945,12 +991,14 @@ def data_char_init( name ):
   file.write( 'items: 1:1,2:1,' ) # Defaults to sword/pickaxe
   for i in range( 14 ):
     file.write( '0:0' + ( ',' if i != 15 else '' ) )
+  file.write( '\ndeaths: 0' )
   file.write( '\nplay_time: 0' )
+  file.write( '\nversion: 1.0' )
 
 # Load a character file with a given name
 def data_char_load( name ):
 
-  global g_hp, g_hp_max, g_items, g_play_time
+  global g_hp, g_hp_max, g_items, g_deaths, g_versions, g_play_time
 
   # Split file into statements/read HP data
   file = open( 'c_' + name + '.txt', 'r' ).read().split( '\n' )
@@ -965,8 +1013,10 @@ def data_char_load( name ):
 
   update_inv( 0, 0, mode = '!' ) # Properly organizes inventory
 
-  # ..also play time
-  g_play_time = int( file[2][11:] )
+  # Other stuff
+  g_deaths = int( file[2][8:] )
+  g_versions[0] = file[3][9:]
+  g_play_time = int( file[4][11:] )
 
 # Write back to the character file if something changed
 def data_char_update( name ):
@@ -980,7 +1030,11 @@ def data_char_update( name ):
   file.write( 'items: ' )
   for i in range( 16 ):
     file.write( f'{ g_items[i][0] }:{ g_items[i][1] }' + ( ',' if i != 15 else '' ) )
-  file.write( '\nplay_time: 0' )
+
+  # Other stuff
+  file.write( f'\ndeaths: { g_deaths }' ) 
+  file.write( f'\nversion: { g_versions[0] }' )
+  file.write( f'\nplay_time: { int( g_play_time ) }' )
 
 def generate_world( size, seed ):
 
@@ -1167,6 +1221,7 @@ def data_world_init( name, seed ):
   # Write non-tile data
   file.write( f'size: { size.x },{ size.y }\n')
   file.write( f'seed: { seed }\n')
+  file.write( 'version: 1.0\n')
   file.write( f'player_pos: { g_pos.x },{ g_pos.y }\n' )
 
   # Write tile data
@@ -1177,7 +1232,7 @@ def data_world_init( name, seed ):
 # Load a world file with a given name
 def data_world_load( name ):
 
-  global g_pos, g_world_size, g_seed, g_tile_data, g_show_help, g_slot
+  global g_pos, g_world_size, g_seed, g_tile_data, g_show_help, g_slot, g_versions, g_play_time_last
 
   # Split file into statements
   file = open( 'w_' + name + '.txt', 'r' ).read().split( '\n' )
@@ -1185,16 +1240,18 @@ def data_world_load( name ):
   # Read basic positional data
   g_world_size = V2( int( file[0][6:].split( ',' )[0] ), int( file[0][6:].split( ',' )[1] ) )
   g_seed = int( file[1][6:] )
-  g_pos = V2( int( file[2][12:].split( ',' )[0] ), int( file[2][12:].split( ',' )[1] ) )
+  g_versions[1] = file[2][9:]
+  g_pos = V2( int( file[3][12:].split( ',' )[0] ), int( file[3][12:].split( ',' )[1] ) )
 
   # Read tile data
   g_tile_data = "";
   for j in range( g_world_size.y ):
-    g_tile_data += file[3 + j]
+    g_tile_data += file[4 + j]
   g_tile_data = list( g_tile_data )
 
   g_show_help = True # Shows a help message on your first turn in the world
   g_slot = 0 # Reset selected slot
+  g_play_time_last = time.time()
 
 # Write back to the world file if something changed
 def data_world_update( name ):
@@ -1204,6 +1261,7 @@ def data_world_update( name ):
   # Write non-tile data
   file.write( f'size: { g_world_size.x },{ g_world_size.y }\n')
   file.write( f'seed: { g_seed }\n')
+  file.write( f'version: { g_versions[1] }\n')
   file.write( f'player_pos: { g_pos.x },{ g_pos.y }\n' )
 
   # Write tile data
@@ -1504,7 +1562,10 @@ def room_world_create():
 #
 def room_scene( arg = '' ):
 
-  global g_pos, g_view, g_tile_data, g_show_help, g_slot, g_monster
+  global g_pos, g_view, g_tile_data, g_show_help, g_slot, g_monster, g_hp
+
+  # Track play time :)
+  update_playtime()
 
   # Args can be set to 1 to avoid re-printing room data
   if not ( len( arg ) > 0 and arg[0] == '1' ):
@@ -2211,6 +2272,7 @@ def room_inventory( arg = "" ):
         # Make sure the item isn't a pickaxe
         elif g_items[ list( '1234567890ABCDEF' ).index( p ) ][0] == 2:
           print( '[#] "Copper Pickaxe" cannot be trashed!' )
+          goto_room( room_inventory, '1' ) # Quit option to prevent softlock
 
         # Trash the item, and re-show inventory
         else:
@@ -2394,9 +2456,10 @@ def start_fight( monster_id ):
   
   global g_monster
   if monster_id == 'slime': g_monster = MonsterSlime()
-  if monster_id == 'zombie': g_monster = MonsterZombie()
-  if monster_id == 'demon_eye': g_monster = MonsterDemonEye()
-  if monster_id == 'cave_bat': g_monster = MonsterCaveBat()
+  elif monster_id == 'zombie': g_monster = MonsterZombie()
+  elif monster_id == 'demon_eye': g_monster = MonsterDemonEye()
+  elif monster_id == 'cave_bat': g_monster = MonsterCaveBat()
+  elif monster_id == 'skeleton': g_monster = MonsterSkeleton()
   else: g_monster = MonsterSlime()
   
   print_line()
@@ -2437,6 +2500,7 @@ def room_fight():
   print( f'You: { g_hp } HP' )
   print( f'{ g_monster.name }: { g_monster.hp } HP' )
   allowed_inputs = g_monster.get_options( player_turn = False )
+  print( '[!] Attempt escape' )
   print( '[*] Pause' )
 
   # Get inputs
@@ -2446,6 +2510,17 @@ def room_fight():
     # Pause
     if p == '*':
       goto_room( room_pause, 'goto_room( room_fight )' )
+
+    # Escape
+    elif p == '!':
+      if random.choice( ( False, False, False ) ):
+        print( '[!] You successfully escaped.' )
+        input( '[!] Press enter to exit the fight. ' )
+        goto_room( room_scene )
+      else:
+        print( '[!] Your attempt to escape was unsuccessful.' )
+        g_monster.turn( '!' )
+      break
 
     # Turn
     elif p in allowed_inputs:
@@ -2460,6 +2535,10 @@ def room_fight():
 
 def room_death():
 
+  global g_hp, g_deaths
+
+  g_deaths += 1
+
   print_line()
   time.sleep( 1 )
   for c in 'You were slain...':
@@ -2473,6 +2552,8 @@ def room_death():
     print( f'Respawning in {i} second{ "s" if i != 1 else "" }.     ', end = '\r' )
     time.sleep( 1 )
   print( 'Respawning!' + ' ' * 20 )
+
+  g_hp = g_hp_max
 
   goto_room( room_scene )
 
@@ -2489,6 +2570,12 @@ def room_pause( arg = '' ):
 
     # Quit
     if p == 'q':
+
+      # Save data
+      data_char_update( g_cname )
+      data_world_update( g_wname )
+
+      # Return
       print( '[!] Returned to menu.' )
       goto_room( room_menu )
 
