@@ -64,6 +64,7 @@ def char2tile( c ):
   if c == 'G': return g_tmap[ 'gold' ]
   if c == 'w': return g_tmap[ 'wood' ]
   if c == 'c': return g_tmap[ 'chest' ]
+  if c == 'C': return g_tmap[ 'crystal' ]
   return '?'
 
 # Used for switching rooms
@@ -584,7 +585,8 @@ g_tmap = {
   'silver': '$',
   'gold': '%',
   'wood': '=',
-  'chest': '©'
+  'chest': '©',
+  'crystal': '♥'
 }
 g_monster = 0
 
@@ -594,7 +596,7 @@ def data_main_init():
   file = open( 'data.txt', 'w', encoding = 'utf-8' )
   file.write( 'characters: \n' )
   file.write( 'worlds: \n' )
-  file.write( 'blocks: player=Δ;air= ;grass=~;stone=#;log=];leaves=*;iron=&;silver=$;gold=%;wood==;chest=©' )
+  file.write( 'blocks: player=Δ;air= ;grass=~;stone=#;log=];leaves=*;iron=&;silver=$;gold=%;wood==;chest=©;crystal=♡' )
 
 # Loads character list, world list, and settings
 def data_main_load():
@@ -711,6 +713,10 @@ def generate_world( size, seed ):
   TREES = True
   ORES = True
   ORES_FREQ = 128
+  CRYSTALS = True
+  CRYSTALS_FREQ = 25
+  CHESTS = True
+  CHESTS_FREQ = 12
 
   global g_tile_data, g_pos
 
@@ -764,15 +770,15 @@ def generate_world( size, seed ):
       # Which (somehow) usually leads to the blob-like shape I was going for
       # However, it's still possible for it to come out looking like a snake
       for l2 in range( 48 ):
-        d += random.randrange( -10, 10 )
+        d += random.randrange( -10, 10 ) 
         o.a( cos( d ), sin( d ) )
         if o.y < ( size.y / 2 ) + noise_top( o.x, seed ) + 4:
           continue
         g_tile_data[ xy2c( clamp( int( o.x ), 1, size.x - 2 ), clamp( int( o.y ), 1, size.y - 2 ), size.x ) ] = c
 
-      progress = print_progress( progress, ORES_FREQ, 40, 'Generating ore veins' ) # Update progress
+      progress = print_progress( progress, ORES_FREQ, 35, 'Generating ore veins' ) # Update progress
   else:
-    progress = print_progress( progress, 1, 40, 'Generating ore veins' ) # Autofill progress if skipped
+    progress = print_progress( progress, 1, 35, 'Generating ore veins' ) # Autofill progress if skipped
 
   # Generate large caves
   if CAVES:
@@ -800,10 +806,10 @@ def generate_world( size, seed ):
             if dist( o, V2( i, j ) ) < s:
               g_tile_data[ xy2c( i, j, size.x ) ] = ' '
 
-      progress = print_progress( progress, CAVES_FREQ, 20, 'Generating caves' ) # Update progress
+      progress = print_progress( progress, CAVES_FREQ, 15, 'Generating caves' ) # Update progress
 
   else:
-    progress = print_progress( progress, 1, 20, 'Generating caves' ) # Autofill progress if skipped
+    progress = print_progress( progress, 1, 15, 'Generating caves' ) # Autofill progress if skipped
 
   # Generate small air pockets
   if POCKETS:
@@ -817,7 +823,7 @@ def generate_world( size, seed ):
       o.y = random.randint( int( ( size.y / 2 ) + noise_top( o.x, seed ) ) + 10, size.y )
       d = 0
       for l2 in range( 64 ):
-        d += random.randrange( -10, 10 )
+        d += random.randrange( -10, 10 ) 
         o.a( cos( d ), sin( d ) )
         g_tile_data[ xy2c( clamp( int( o.x ), 1, size.x - 2 ), clamp( int( o.y ), 1, size.y - 2 ), size.x ) ] = ' '
 
@@ -866,6 +872,39 @@ def generate_world( size, seed ):
     progress = print_progress( progress, 1, 5, 'Generating trees' ) # Update progress
   else:
     progress = print_progress( progress, 1, 5, 'Generating trees' ) # Autofill progress if skipped
+
+  # Generate life crystals
+  c_total = 0
+  if CRYSTALS:
+    
+    # Each iteration creates a new life crystal
+    for l1 in range( CRYSTALS_FREQ ):
+
+      # Basically a while loop but with a limit so it doesn't go forever if something unexpected happens
+      for l2 in range( 999 ):
+
+        # Choose a random position underground
+        o = V2( random.randint( 0, size.x ), random.randint( int( size.y * 0.7 ), size.y - 5 ) )
+
+        # Continue downward until stone block is found
+        for l3 in range( o.y, size.y - 4 ):
+
+          # Check if a life crystal can go here
+          o.y += 1
+          if g_tile_data[ xy2c( *o.l(), size.x ) ] == ' ' and g_tile_data[ xy2c( *o.copy().a( 0, 1 ).l(), size.x ) ] == 's':
+
+            # Create a life crystal and exit the loop
+            g_tile_data[ xy2c( *o.l(), size.x ) ] = 'C'
+            c_total += 1
+            break
+        else:
+          continue
+
+        break
+
+      progress = print_progress( progress, CRYSTALS_FREQ, 5, 'Generating life crystals' ) # Update progress
+  else:
+    progress = print_progress( progress, 1, 5, 'Generating life crystals' ) # Autofill progress if skipped
 
   # Lastly, position the player
   g_pos = V2( size.x // 2, int( ( size.y / 2 ) + noise_top( size.x // 2, seed ) ) - 1 )
