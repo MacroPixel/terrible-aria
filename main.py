@@ -133,13 +133,198 @@ class V2:
     c = V2( self.x, self.y )
     return c
 
-# Base Monster class
+# Monster class
 class Monster:
 
-  def __init__( self ):
+  # I don't think I need to explain what this list is for
+  TYPES = [ 'slime', 'zombie', 'demon_eye', 'cave_bat', 'skeleton', 'undead_miner' ]
 
-    self.hp = 1
-    self.name = 'MISSING'
+  # The health each monster starts off with
+  HEALTHS = {
+    'slime' : 50, 'zombie' : 90, 'demon_eye' : 70, 'cave_bat' : 40,
+    'skeleton' : 150, 'undead_miner' : 120
+  }
+
+  # The player's options for each player turn
+  # Format: [ Letter ID, Action Name, Requirements ]
+  PLAYER_ATTACKS = {
+    'slime' : [ [ 's', 'Swing sword' ], [ 'f', 'Shoot forward' ], [ 'u', 'Shoot upward' ] ],
+    'zombie' : [ [ 's', 'Swing sword' ], [ 'f', 'Shoot forward' ], [ 'u', 'Shoot upward' ] ],
+    'demon_eye' : [ [ 's', 'Jump and swing sword (*)' ], [ 'r', 'Shoot rightward' ], [ 'l', 'Shoot leftward' ] ],
+    'cave_bat' : [ [ 's', 'Jump and swing sword' ], [ 'f', 'Shoot forward' ], [ 'r', 'Shoot rightward' ] ],
+    'skeleton' : [ [ 's', 'Swing sword (*)' ], [ 'j', 'Jump and swing sword' ], [ 'u', 'Shoot upward' ],
+      [ 'r', 'Shoot rightward' ], [ 'l', 'Shoot leftward' ] ],
+    'undead_miner' : [ [ 's', 'Swing sword' ], [ 'a', 'Shoot arrow' ] ]
+  }
+
+  # The monster's options for each player turn
+  MONSTER_DODGES = {
+    'slime' : [ 'jump', 'sit' ],
+    'zombie' : [ 'jump', 'move backward' ],
+    'demon_eye' : [ 'fly rightward', 'fly leftward' ],
+    'cave_bat' : [ 'hover', 'fly sideways', 'fly upward' ],
+    'skeleton' : [ 'shield', 'jump', 'move rightward', 'move leftward' ],
+    'undead_miner' : [ 'deflect', 'jump' ]
+  }
+
+  # The result of each player turn
+  # Format: [ Text + HP Lost + 'p'layer/'e'nemy ]
+  P_TURN_RESULTS = {
+    'slime : s : jump' : [ 'The enemy jumped over your sword.' ],
+    'slime : s : sit' : [ 'You attacked the enemy.', ( 12, 24 ) ],
+    'slime : f : jump' : [ 'The enemy jumped over your arrow.' ],
+    'slime : f : sit' : [ 'The enemy stayed stationary and was hit by your arrow.', ( 8, 16 ) ],
+    'slime : u : jump' : [ 'The enemy jumped into your arrow.', ( 8, 16 ) ],
+    'slime : u : sit' : [ 'The enemy stayed stationary, so your arrow missed.' ],
+    'zombie : s : jump' : [ 'The enemy jumped over your sword.' ],
+    'zombie : s : move backward' : [ 'The enemy moved backward, but was still hit by your sword.', ( 12, 24 ) ],
+    'zombie : f : jump' : [ 'The enemy jumped over your arrow.' ],
+    'zombie : f : move backward' : [ 'The enemy moved backward, but was still hit by your arrow.', ( 8, 16 ) ],
+    'zombie : u : jump' : [ 'The enemy jumped into your arrow.', ( 8, 16 ) ],
+    'zombie : u : move backward' : [ 'The enemy moved backward, so your arrow missed.' ],
+    'demon_eye : s : fly rightward' : [ 'chance', ( ( 0, 49, 'hit' ), ( 50, 99, 'miss' ) ) ],
+    'demon_eye : s : fly rightward : hit' : [ 'You jumped and hit the enemy with your sword.', ( 12, 24 ) ],
+    'demon_eye : s : fly rightward : miss' : [ 'You jumped, but barely missed the enemy.' ],
+    'demon_eye : s : fly leftward' : [ 'chance', ( ( 0, 49, 'hit' ), ( 50, 99, 'miss' ) ) ],
+    'demon_eye : s : fly leftward : hit' : [ 'You jumped and hit the enemy with your sword.', ( 12, 24 ) ],
+    'demon_eye : s : fly leftward : miss' : [ 'You jumped, but barely missed the enemy.' ],
+    'demon_eye : r : fly rightward' : [ 'The enemy flew rightward and was hit by your arrow.', ( 8, 16 ) ],
+    'demon_eye : r : fly leftward' : [ 'The enemy flew leftward, so your arrow missed.' ],
+    'demon_eye : l : fly rightward' : [ 'The enemy flew rightward, so your arrow missed.' ],
+    'demon_eye : l : fly leftward' : [ 'The enemy flew leftward and was hit by your arrow.', ( 8, 16 ) ],
+    'cave_bat : s : hover' : [ 'The enemy didn\'t move, so you jumped and hit it with your sword.', ( 12, 24 ) ],
+    'cave_bat : s : fly sideways' : [ 'You jumped towards the enemy, but it flew sideways.' ],
+    'cave_bat : s : fly upward' : [ 'You jumped towards the enemy, but it flew further away.' ],
+    'cave_bat : f : hover' : [ 'The enemy didn\'t move, so your arrow hit it.', ( 8, 16 ) ],
+    'cave_bat : f : fly sideways' : [ 'You shot at the enemy, but it flew sideways.' ],
+    'cave_bat : f : fly upward' : [ 'The enemy flew further away, but was still hit by your arrow.', ( 8, 16 ) ],
+    'cave_bat : r : hover' : [ 'The enemy didn\'t move, so your arrow flew to its right.' ],
+    'cave_bat : r : fly sideways' : [ 'The enemy flew rightward into your arrow.', ( 8, 16 ) ],
+    'cave_bat : r : fly upward' : [ 'The enemy flew further away, and your arrow flew to its right.' ],
+    'skeleton : s : shield' : [ 'You swung your sword at the enemy, but it absorbed your attack.' ],
+    'skeleton : s : jump' : [ 'chance', ( ( 0, 49, 'hit' ), ( 50, 99 ), 'miss' ) ],
+    'skeleton : s : jump : hit' : [ 'The enemy was about to jump, but you hit it with your sword.', ( 12, 24 ) ],
+    'skeleton : s : jump : miss' : [ 'You swung your sword at the enemy, but it jumped over it.' ],
+    'skeleton : s : move rightward' : [ 'You swung your sword at the enemy, but it moved rightward.' ],
+    'skeleton : s : move leftward' : [ 'You swung your sword at the enemy, but it moved leftward.' ],
+    'skeleton : j : shield' : [ 'The enemy remained stationary, so you jumped too high to hit it.' ],
+    'skeleton : j : jump' : [ 'The enemy jumped, so you jumped and hit it with your sword.', ( 16, 28 ) ],
+    'skeleton : j : move rightward' : [ 'You jumped and swung, but the enemy dodged rightward.' ],
+    'skeleton : j : move leftward' : [ 'You jumped and swung, but the enemy dodged leftward.' ],
+    'skeleton : u : shield' : [ 'The enemy remained stationary, so your arrow missed it.' ],
+    'skeleton : u : jump' : [ 'The enemy jumped and was hit by your arrow.', ( 8, 16 ) ],
+    'skeleton : u : move rightward' : [ 'You shot your arrow upward, but the enemy moved rightward.' ],
+    'skeleton : u : move leftward' : [ 'You shot your arrow upward, but the enemy moved leftward.' ],
+    'skeleton : r : shield' : [ 'The enemy remained stationary, so your arrow missed it.' ],
+    'skeleton : r : jump' : [ 'You shot your arrow rightward, but the enemy jumped.' ],
+    'skeleton : r : move rightward' : [ 'The enemy moved rightward into your arrow.', ( 8, 16 ) ],
+    'skeleton : r : move leftward' : [ 'You shot your arrow rightward, but the enemy moved leftward.' ],
+    'skeleton : l : shield' : [ 'The enemy remained stationary, so your arrow missed it.' ],
+    'skeleton : l : jump' : [ 'You shot your arrow rightward, but the enemy jumped.' ],
+    'skeleton : l : move rightward' : [ 'You shot your arrow leftward, but the enemy moved rightward.' ],
+    'skeleton : l : move leftward' : [ 'The enemy moved leftward into your arrow.', ( 8, 16 ) ],
+    'undead_miner : s : deflect' : [ 'The enemy stayed still, so you hit it with your sword.', ( 12, 24 ) ],
+    'undead_miner : s : jump' : [ 'The enemy jumped over your sword.' ],
+    'undead_miner : a : deflect' : [ 'You shot at the enemy, but it blew up your arrow with a grenade.' ],
+    'undead_miner : a : jump' : [ 'The enemy jumped, and you shot your arrow at it.', ( 6, 12 ) ]
+  }
+
+  # The player's options for each monster turn
+  # Format: [ Letter ID, Action Name, Requirements ]
+  PLAYER_DODGES = {
+    'slime' : [ [ 'b', 'Move backward' ], [ 'f', 'Move forward' ], [ 's', 'Stay stationary' ] ],
+    'zombie' : [ [ 'b', 'Move backward' ], [ 'f', 'Move forward' ], [ 'j', 'Jump' ] ],
+    'demon_eye' : [ [ 'b', 'Move backward' ], [ 'r', 'Move rightward' ], [ 'l', 'Move leftward' ], [ 'j', 'Jump (*)' ] ],
+    'cave_bat' : [ [ 'j', 'Jump' ], [ 's', 'Stay stationary' ] ],
+    'skeleton' : [ [ 'j', 'Jump' ], [ 'b', 'Move backward' ] ],
+    'undead_miner' : [ [ 'j', 'Jump' ], [ 'f', 'Step forward' ], [ 's', 'Stay stationary' ] ],
+  }
+
+  # The monster's options for each monster turn
+  MONSTER_ATTACKS = {
+    'slime' : [ 'leap', 'leap' ],
+    'zombie' : [ 'jump', 'arm' ],
+    'demon_eye' : [ 'from front', 'from side' ],
+    'cave_bat' : [ 'missed', 'low attack', 'high attack' ],
+    'skeleton' : [ 'charge', 'jump', 'bone', 'bone upward' ],
+    'undead_miner' : [ 'charge', 'grenade' ]
+  }
+
+  # The result of each monster turn
+  # Format: [ Text + HP Lost + 'p'layer/'e'nemy ]
+  M_TURN_RESULTS = {
+    'slime : b : leap' : [ 'The enemy leaped onto you, but you moved out of the way.' ],
+    'slime : f : leap' : [ 'The enemy leaped onto you, but you moved out of the way.' ],
+    'slime : s : leap' : [ 'The enemy leaped onto you.', ( 8, 20 ) ],
+    'slime : ! : leap' : [ 'The enemy leaped onto you.', ( 8, 20 ) ],
+    'zombie : b : jump' : [ 'You moved backward, and the enemy jumped into you.', ( 12, 20 ) ],
+    'zombie : b : arm' : [ 'The enemy swung its arm, but you moved out of its reach.' ],
+    'zombie : f : jump' : [ 'You run past the enemy while it was jumping.' ],
+    'zombie : f : arm' : [ 'The enemy swing its arm, and you walked into it.', ( 6, 12 ) ],
+    'zombie : j : jump' : [ 'You and the enemy both jumped forward.', ( 10, 16 ) ],
+    'zombie : j : arm' : [ 'The enemy swung its arm, but you jumped over it.' ],
+    'zombie : ! : jump' : [ 'The enemy jumped onto you.', ( 12, 20 ) ],
+    'zombie : ! : arm' : [ 'The enemy swing its arm at you.', ( 6, 12 ) ],
+    'demon_eye : b : from front' : [ 'You moved backward, and the enemy flew into you.', ( 10, 18 ) ],
+    'demon_eye : b : from side' : [ 'The enemy flew in from the side, and you dodged its attack.' ],
+    'demon_eye : r : from front' : [ 'The enemy flew in from the front, and you dodged its attack.' ],
+    'demon_eye : r : from side' : [ 'You moved rightward, and the enemy flew into you.', ( 10, 18 ) ],
+    'demon_eye : l : from front' : [ 'The enemy flew in from the front, and you dodged its attack.' ],
+    'demon_eye : l : from side' : [ 'You moved leftward, and the enemy flew into you.', ( 10, 18 ) ],
+    'demon_eye : j : from front' : [ 'chance', ( ( 0, 49, 'dodge' ), ( 50, 99, 'fail' ) ) ],
+    'demon_eye : j : from front : dodge' : [ 'The enemy flew in from the front, and you jumped over it.' ],
+    'demon_eye : j : from front : fail' : [ 'The enemy flew in from the front, and you didn\'t jump over it in time.' ],
+    'demon_eye : j : from side' : [ 'chance', ( ( 0, 49, 'dodge' ), ( 50, 99, 'fail' ) ) ],
+    'demon_eye : j : from side : dodge' : [ 'The enemy flew in from the side, and you jumped over it.' ],
+    'demon_eye : j : from side : fail' : [ 'The enemy flew in from the side, and you didn\'t jump over it in time.', ( 10, 18 ) ],
+    'demon_eye : ! : from front' : [ 'The enemy flew into you.', ( 10, 18 ) ],
+    'demon_eye : ! : from side' : [ 'The enemy flew into you.', ( 10, 18 ) ],
+    'cave_bat : j : missed' : [ 'The enemy flew towards you, but it missed.' ],
+    'cave_bat : j : low attack' : [ 'You jumped, and the enemy flew under you.' ],
+    'cave_bat : j : high attack' : [ 'The enemy flew over you, and you jumped into it.', ( 10, 18 ) ],
+    'cave_bat : s : missed' : [ 'The enemy flew towards you, but it missed.' ],
+    'cave_bat : s : low attack' : [ 'The enemy flew into you.', ( 10, 18 ) ],
+    'cave_bat : s : high attack' : [ 'The enemy flew over you.' ],
+    'cave_bat : ! : missed' : [ 'The enemy flew towards you, but it missed.' ],
+    'cave_bat : ! : low attack' : [ 'The enemy flew into you.', ( 10, 18 ) ],
+    'cave_bat : ! : high attack' : [ 'The enemy flew over you.' ],
+    'skeleton : j : charge' : [ 'The enemy charged toward you, and you jumped over it.' ],
+    'skeleton : j : jump' : [ 'You and the enemy both jumped towards each other.', ( 18, 28 ) ],
+    'skeleton : j : bone' : [ 'The enemy threw a bone at you, and you jumped over it.' ],
+    'skeleton : j : bone upward' : [ 'The enemy threw a bone upward, and you jumped into it.', ( 18, 28 ) ],
+    'skeleton : b : charge' : [ 'The enemy charged toward you, and you didn\t back up far enough.', ( 20, 40 ) ],
+    'skeleton : b : jump' : [ 'The enemy tried to jump on you, but you moved backwards.' ],
+    'skeleton : b : bone' : [ 'The enemy threw a bone, and it hit you.', ( 8, 18 ) ],
+    'skeleton : b : bone upward' : [ 'The enemy threw a bone upward, and it missed you.' ],
+    'skeleton : ! : charge' : [ 'The enemy charged toward you, and you didn\t back up far enough.', ( 20, 40 ) ],
+    'skeleton : ! : jump' : [ 'The enemy tried to jump on you, but you moved backwards.' ],
+    'skeleton : ! : bone' : [ 'The enemy threw a bone, and it hit you.', ( 8, 18 ) ],
+    'skeleton : ! : bone upward' : [ 'The enemy threw a bone upward, and it missed you.' ],
+    'undead_miner : j : charge' : [ 'The enemy charged towards you, but you jumped over it.' ],
+    'undead_miner : j : grenade' : [ 'You jumped, but the enemy arced a grenade at you.', ( 24, 48 ) ],
+    'undead_miner : f : charge' : [ 'The enemy charged towards you, and you ran into it.', ( 14, 28 ) ],
+    'undead_miner : f : grenade' : [ 'The enemy arced a grenade at you, but you stepped forward out of the way.' ],
+    'undead_miner : s : charge' : [ 'The enemy charged towards you, and you didn\'t move out of its way.', ( 14, 28 ) ],
+    'undead_miner : s : grenade' : [ 'The enemy arced a grenade at you, and you didn\'t move out of the way.', ( 14, 28 ) ],
+    'undead_miner : ! : charge' : [ 'The enemy charged towards you.', ( 14, 28 ) ],
+    'undead_miner : ! : grenade' : [ 'The enemy arced a grenade at you.', ( 14, 28 ) ]
+  }
+
+  def __init__( self, name ):
+
+    self.hp = self.HEALTHS[ name ]
+    self.name = name if ( name in self.TYPES ) else 'slime'
+
+    # The next move, first move, and current move are used for calculating the next move ID
+    self.move = random.randint( 0, len( self.MONSTER_DODGES[ name ] ) - 1 )
+    self.move_0 = self.move
+    self.move_c = 0
+
+    if self.name == 'zombie':
+      self.move_c = 1 if self.move == 0 else 0
+
+    if self.name == 'cave_bat':
+      self.move_c = self.move
 
   # Deals damage to self, allowing a random range and multiplier to be used
   def damage( self, a, b = 'NONE', m = 1, entity = 'self' ):
@@ -159,639 +344,114 @@ class Monster:
       g_hp -= amount
     return amount
 
+  def get_options( self, player_turn, should_print = True ):
+
+    t = []
+    for s in ( self.PLAYER_ATTACKS[ self.name ] if player_turn else self.PLAYER_DODGES[ self.name ] ):
+      if should_print:
+        print( f'[{ s[0].upper() }] { s[1] }' )
+      t.append( s[0].lower() )
+
+    return t
+  
+  def player_turn( self, p ):
+
+    # Set temporary variables
+    t = self.P_TURN_RESULTS[ f'{ self.name } : { p } : { self.MONSTER_DODGES[ self.name ][ self.move ] }' ]
+
+    # Evaluate chance
+    if t[0] == 'chance':
+      temp_rand = random.randint( 0, 99 )
+      for i in t[1]:
+        if ( i[0] <= temp_rand <= i[1] ):
+          t = self.P_TURN_RESULTS[ f'{ self.name } : { p } : { self.MONSTER_DODGES[ self.name ][ self.move ] } : { i[2] }' ]
+          break
+      else:
+        print( "ERROR: Random values don't add up to 100." )
+
+    if len( t ) == 1: t.append( 0 )
+    if len( t ) == 2: t.append( 'e' )
+
+    # Display text/subtract HP
+    print( '[!] ' + t[0] )
+    print( '[*] ' + ( 'Enemy' if t[2] == 'e' else 'You' ) + ': ' + ( '-' + str( self.damage( *t[1], entity = 'self' if t[2] == 'e' else 'you' ) ) + ' HP' if t[1] != 0 else 'NO DAMAGE' ) )
+
+    # Check if fight is over
+    self.hp_check()
+
+    # Advance move
+    self.advance_move()
+  
+  def monster_turn( self, p ):
+
+
+    # Set temporary variables
+    t = self.M_TURN_RESULTS[ f'{ self.name } : { p } : { self.MONSTER_ATTACKS[ self.name ][ self.move ] }' ]
+
+    # Evaluate chance
+    if t[0] == 'chance':
+      temp_rand = random.randint( 0, 99 )
+      for i in t[1]:
+        if ( i[0] <= temp_rand <= i[1] ):
+          t = self.M_TURN_RESULTS[ f'{ self.name } : { p } : { self.MONSTER_ATTACKS[ self.name ][ self.move ] } : { i[2] }' ]
+          break
+      else:
+        print( "ERROR: Random values don't add up to 100." )
+
+    if len( t ) == 1: t.append( 0 )
+    if len( t ) == 2: t.append( 'p' )
+
+    print( '[!] ' + t[0] )
+    print( '[*] ' + ( 'Enemy' if t[2] == 'e' else 'You' ) + ': ' + ( '-' + str( self.damage( *t[1], entity = 'self' if t[2] == 'e' else 'you' ) ) + ' HP' if t[1] != 0 else 'NO DAMAGE' ) )
+
+    # Check if fight is over
+    self.hp_check()
+
+    # Advance move
+    self.advance_move()
+
   # Checks if either entity has died
   def hp_check( self ):
 
     if self.hp <= 0:
       print_line()
-      print( f'[!] { self.name } was killed.' )
+      print( f"[!] { self.name.replace( '_', ' ' ).title() } was killed." )
       input( '[!] Press enter to exit the fight. ' )
       goto_room( room_scene )
 
     if g_hp <= 0:
       print_line()
-      print( f'[!] { self.name } won.' )
+      print( f"[!] { self.name.replace( '_', ' ' ).title() } won." )
       input( '[!] Press enter to exit the fight. ' )
       goto_room( room_death )
 
-class MonsterSlime( Monster ):
-
-  def __init__( self ):
-
-    self.hp = 50
-    self.name = 'Slime'
-
-    self.attack = random.choice( ( 0, 1 ) )
-
-  def get_options( self, player_turn, should_print = True ):
-
-    # Player offensive
-    if player_turn:
-      print( '[S] Swing sword' )
-      print( '[F] Shoot forward' )
-      print( '[U] Shoot upward' )
-      return ( 's', 'f', 'u' )
-
-    # Player defensive
-    else:
-      print( '[B] Move backward' )
-      print( '[F] Move forward' )
-      print( '[S] Stay stationary' )
-      return ( 'b', 'f', 's' )
-
-  # They player's turn is defined here because it depends on the monster's behavior
-  def player_turn( self, p ):
-
-    # Swing sword
-    if p == 's':
-
-      if self.attack == 0: # Jump
-        print( '[!] The enemy jumped over your sword.' )
-        print( '[*] Enemy: NO DAMAGE' )
-      if self.attack == 1: # Sit
-        print( '[!] You attacked the enemy.' )
-        print( f'[*] Enemy: -{ self.damage( 12, 24 ) } HP' )
-
-    # Shoot forward
-    elif p == 'f':
-
-      if self.attack == 0: # Jump
-        print( '[!] The enemy jumped over your arrow.' )
-        print( '[*] Enemy: NO DAMAGE' )
-      if self.attack == 1: # Sit
-        print( '[!] The enemy stayed stationary and was hit by your arrow.' )
-        print( f'[*] Enemy: -{ self.damage( 8, 16 ) } HP' )
-
-    # Shoot upward
-    elif p == 'u':
-
-      if self.attack == 0: # Jump
-        print( '[!] The enemy jumped into your arrow.' )
-        print( f'[*] Enemy: -{ self.damage( 8, 16 ) } HP' )
-      if self.attack == 1: # Sit
-        print( '[!] The enemy stayed stationary, so your arrow missed.' )
-        print( '[*] Enemy: NO DAMAGE' )
-
-    # Check if either entity died
-    self.hp_check()
-
-  # The enemy's turn to attack
-  def turn( self, p ):
-    
-    # Move backward/forward
-    if p == 'b' or p == 'f':
-
-      # Leap
-      print( '[!] The enemy leaped onto you, but you moved out of the way.' )
-      print( '[*] You: NO DAMAGE' )
-
-    # Stay still (escape default)
-    elif p == 's' or p == '!':
-
-      # Leap
-      print( '[!] The enemy leaped onto you.' )
-      print( f'[*] You: -{ self.damage( 8, 20, entity = "you" ) } HP' )
-
-    # Check if either entity died
-    self.hp_check()
-
-    # Progress attack
-    self.attack = 1 - self.attack
-
-class MonsterZombie( Monster ):
-
-  def __init__( self ):
-
-    self.hp = 90
-    self.name = 'Zombie'
-
-    self.attack = random.choice( ( 0, 1 ) )
-    self.attack_c = 1 if self.attack == 0 else 0
-
-  def get_options( self, player_turn, should_print = True ):
-
-    # Player offensive
-    if player_turn:
-      print( '[S] Swing sword' )
-      print( '[F] Shoot forward' )
-      print( '[U] Shoot upward' )
-      return ( 's', 'f', 'u' )
-
-    # Player defensive
-    else:
-      print( '[B] Move backward' )
-      print( '[F] Move forward' )
-      print( '[J] Jump' )
-      return ( 'b', 'f', 'j' )
-
-  # They player's turn is defined here because it depends on the monster's behavior
-  def player_turn( self, p ):
-
-    # Swing sword
-    if p == 's':
-
-      if self.attack == 0: # Jump
-        print( '[!] The enemy jumped over your sword.' )
-        print( f'[*] Enemy: NO DAMAGE' )
-      if self.attack == 1: # Move back
-        print( '[!] The enemy moved backward, but was still hit by your sword.' )
-        print( f'[*] Enemy: -{ self.damage( 12, 24 ) } HP' )
-
-    # Shoot forward
-    elif p == 'f':
-
-      if self.attack == 0: # Jump
-        print( '[!] The enemy jumped over your arrow.' )
-        print( '[*] Enemy: NO DAMAGE' )
-      if self.attack == 1: # Move back
-        print( '[!] The enemy moved backward, but was still hit by your arrow.' )
-        print( f'[*] Enemy: -{ self.damage( 8, 16 ) } HP' )
-
-    # Shoot upward
-    elif p == 'u':
-
-      if self.attack == 0: # Jump
-        print( '[!] The enemy jumped into your arrow.' )
-        print( f'[*] Enemy: -{ self.damage( 8, 16 ) } HP' )
-      if self.attack == 1: # Move back
-        print( '[!] The enemy moved backward, so your arrow missed.' )
-        print( '[*] Enemy: NO DAMAGE' )
-
-    # Check if either entity died
-    self.hp_check()
-
-    # Progress attack
-    self.attack_c += 1
-    if self.attack_c % 3 == 0:
-      self.attack = 1 - self.attack
-
-  # The enemy's turn to attack
-  def turn( self, p ):
-    
-    # Move backward
-    if p == 'b':
-
-      if self.attack == 0: # Jump
-        print( '[!] You moved backward, and the enemy jumped into you.' )
-        print( f'[*] You: -{ self.damage( 12, 20, entity = "you" ) } HP' )
-      if self.attack == 1: # Arm
-        print( '[!] The enemy swung its arm, but you moved out of its reach.' )
-        print( '[*] You: NO DAMAGE' )
-
-    # Move forward
-    elif p == 'f':
-
-      if self.attack == 0: # Jump
-        print( '[!] You run past the enemy while it was jumping.' )
-        print( '[*] You: NO DAMAGE' )
-      if self.attack == 1: # Arm
-        print( '[!] The enemy swing its arm, and you walked into it.' )
-        print( f'[*] You: -{ self.damage( 6, 12, entity = "you" ) } HP' )
-
-    # Jump
-    elif p == 'j':
-
-      if self.attack == 0: # Jump
-        print( '[!] You and the enemy both jumped forward.' )
-        print( f'[*] You: -{ self.damage( 10, 16, entity = "you" ) } HP' )
-      if self.attack == 1: # Arm
-        print( '[!] The enemy swung its arm, and you jumped over it.' )
-        print( '[*] You: NO DAMAGE' )
-
-    # Escape
-    elif p == '!':
-
-      if self.attack == 0: # Jump
-        print( '[!] The enemy jumped onto you.' )
-        print( f'[*] You: -{ self.damage( 12, 20, entity = "you" ) } HP' )
-      if self.attack == 1: # Arm
-        print( '[!] The enemy swing its arm at you.' )
-        print( f'[*] You: -{ self.damage( 6, 12, entity = "you" ) } HP' )
-
-    # Check if either entity died
-    self.hp_check()
-
-    # Progress attack
-    self.attack_c += 1
-    if self.attack_c % 3 == 0:
-      self.attack = 1 - self.attack
-
-class MonsterDemonEye( Monster ):
-
-  def __init__( self ):
-
-    self.hp = 70
-    self.name = 'Demon Eye'
-
-    self.attack = random.choice( ( 0, 1 ) )
-    self.attack_c = 0
-    self.attack_0 = self.attack
-
-  def get_options( self, player_turn, should_print = True ):
-
-    # Player offensive
-    if player_turn:
-      print( '[S] Jump and swing sword (*)' )
-      print( '[R] Shoot rightward' )
-      print( '[L] Shoot leftward' )
-      return ( 's', 'r', 'l' )
-
-    # Player defensive
-    else:
-      print( '[B] Move backward' )
-      print( '[R] Move rightward' )
-      print( '[L] Move leftward' )
-      print( '[J] Jump (*)' )
-      return ( 'b', 'r', 'l', 'j' )
-
-  # They player's turn is defined here because it depends on the monster's behavior
-  def player_turn( self, p ):
-
-    # Jump and swing sword
-    if p == 's':
-
-      # Random chance
-      if random.choice( ( True, False ) ):
-        print( '[!] You jumped and hit the enemy with your sword.' )
-        print( f'[*] Enemy: -{ self.damage( 12, 24 ) } HP' )
-      else:
-        print( '[!] You jumped, but barely missed the enemy.' )
-        print( '[*] Enemy: NO DAMAGE' )
-
-    # Shoot rightward
-    elif p == 'r':
-
-      if self.attack == 0: # Fly right
-        print( '[!] The enemy flew rightward and was hit by your arrow.' )
-        print( f'[*] Enemy: -{ self.damage( 8, 16 ) } HP' )
-      if self.attack == 1: # Fly left
-        print( '[!] The enemy flew leftward, so you arrow missed.' )
-        print( '[*] Enemy: NO DAMAGE' )
-
-    # Shoot leftward
-    elif p == 'l':
-
-      if self.attack == 0: # Fly right
-        print( '[!] The enemy flew rightward, so your arrow missed.' )
-        print( '[*] Enemy: NO DAMAGE' )
-      if self.attack == 1: # Fly left
-        print( '[!] The enemy flew leftward and was hit by your arrow.' )
-        print( f'[*] Enemy: -{ self.damage( 8, 16 ) } HP' )
-
-    # Check if either entity died
-    self.hp_check()
-
-    # Progress attack
-    self.attack_c += 1
-    self.attack = ( self.attack_0 ) if ( self.attack_c % 6 in ( 0, 2, 3 ) ) else ( 1 - self.attack_0 )
-
-  # The enemy's turn to attack
-  def turn( self, p ):
-    
-    # Move backward
-    if p == 'b':
-
-      if self.attack == 0: # From front
-        print( '[!] You moved backward, and the enemy flew into you.' )
-        print( f'[*] You: -{ self.damage( 10, 18, entity = "you" ) } HP' )
-      if self.attack == 1: # From side
-        print( '[!] The enemy flew in from the side, and you dodged its attack.' )
-        print( '[*] You: NO DAMAGE' )
-
-    # Move rightward
-    elif p == 'r':
-
-      if self.attack == 0: # From front
-        print( '[!] The enemy flew in from the front, and you dodged its attack.' )
-        print( '[*] You: NO DAMAGE' )
-      if self.attack == 1: # From side
-        print( '[!] You moved rightward, and the enemy flew into you.' )
-        print( f'[*] You: -{ self.damage( 10, 18, entity = "you" ) } HP' )
-
-    # Move leftward
-    elif p == 'l':
-
-      if self.attack == 0: # From front
-        print( '[!] The enemy flew in from the front, and you dodged its attack.' )
-        print( '[*] You: NO DAMAGE' )
-      if self.attack == 1: # From side
-        print( '[!] You moved leftward, and the enemy flew into you.' )
-        print( f'[*] You: -{ self.damage( 10, 18, entity = "you" ) } HP' )
-
-    # Jump
-    elif p == 'j':
-
-      # Random chance
-      if random.choice( ( True, False ) ):
-        print( f'[!] The enemy flew in from the { "front" if self.attack == 0 else "side" }, and you jumped over it.' )
-        print( '[*] You: NO DAMAGE' )
-      else:
-        print( f'[!] The enemy flew in from the { "front" if self.attack == 0 else "side" }, and you didn\'t jump over it in time.' )
-        print( f'[*] You: -{ self.damage( 10, 18, entity = "you" ) } HP' )
-
-    # Escape
-    elif p == '!':
-
-      print( '[!] The enemy flew into you.' )
-      print( f'[*] You: -{ self.damage( 10, 18, entity = "you" ) } HP' )
-
-    # Check if either entity died
-    self.hp_check()
-
-    # Progress attack
-    self.attack_c += 1
-    self.attack = ( self.attack_0 ) if ( self.attack_c % 6 in ( 0, 2, 3 ) ) else ( 1 - self.attack_0 )
-
-class MonsterCaveBat( Monster ):
-
-  def __init__( self ):
-
-    self.hp = 40
-    self.name = 'Cave Bat'
-
-    self.attack = random.choice( ( 0, 1, 2 ) )
-    self.attack_c = self.attack
-    self.attack_0 = self.attack
-
-  def get_options( self, player_turn, should_print = True ):
-
-    # Player offensive
-    if player_turn:
-      print( '[S] Jump and swing sword' )
-      print( '[F] Shoot forward' )
-      print( '[R] Shoot rightward' )
-      return ( 's', 'f', 'r' )
-
-    # Player defensive
-    else:
-      print( '[J] Jump' )
-      print( '[S] Stay stationary' )
-      return ( 'j', 's' )
-
-  # They player's turn is defined here because it depends on the monster's behavior
-  def player_turn( self, p ):
-
-    # Jump and swing sword
-    if p == 's':
-
-      if self.attack == 0: # Hover
-        print( '[!] The enemy didn\'t move, so you jumped and hit it with your sword.' )
-        print( f'[*] Enemy: -{ self.damage( 12, 24 ) } HP' )
-      if self.attack == 1: # Fly sideways
-        print( '[!] You jumped towards the enemy, but it flew sideways.' )
-        print( '[*] Enemy: NO DAMAGE' )
-      if self.attack == 2: # Fly upward
-        print( '[!] You jumped towards the enemy, but it flew further away.' )
-        print( '[*] Enemy: NO DAMAGE' )
-
-    # Shoot forward
-    elif p == 'f':
-
-      if self.attack == 0: # Hover
-        print( '[!] The enemy didn\'t move, so your arrow hit it.' )
-        print( f'[*] Enemy: -{ self.damage( 8, 16 ) } HP' )
-      if self.attack == 1: # Fly sideways
-        print( '[!] You shot at the enemy, but it flew sideways.' )
-        print( '[*] Enemy: NO DAMAGE' )
-      if self.attack == 2: # Fly upward
-        print( '[!] The enemy flew further away, but was still hit by your arrow.' )
-        print( f'[*] Enemy: -{ self.damage( 8, 16 ) } HP' )
-
-    # Shoot rightward
-    elif p == 'r':
-
-      if self.attack == 0: # Hover
-        print( '[!] The enemy didn\'t move, so your arrow flew to its right.' )
-        print( '[*] Enemy: NO DAMAGE' )
-      if self.attack == 1: # Fly sideways
-        print( '[!] The enemy flew rightward into your arrow.' )
-        print( f'[*] Enemy: -{ self.damage( 8, 16 ) } HP' )
-      if self.attack == 2: # Fly upward
-        print( '[!] The enemy flew further away, and your arrow flew to its right.' )
-        print( '[*] Enemy: NO DAMAGE' )
-
-    # Check if either entity died
-    self.hp_check()
-
-    # Progress attack
-    self.attack_c += ( 1 if self.attack_0 != 1 else -1 )
-    self.attack = self.attack_c % 3
-
-  # The enemy's turn to attack
-  def turn( self, p ):
-    
-    # Jump
-    if p == 'j':
-
-      if self.attack == 0: # Missed
-        print( '[!] The enemy flew towards you, but it missed.' )
-        print( '[*] You: NO DAMAGE' )
-      if self.attack == 1: # Low attack
-        print( '[!] You jumped, and the enemy flew under you.' )
-        print( '[*] You: NO DAMAGE' )
-      if self.attack == 2: # High attack
-        print( '[!] The enemy flew over you, and you jumped into it.' )
-        print( f'[*] You: -{ self.damage( 10, 18, entity = "you" ) } HP' )
-
-    # Stay stationary (Escape default)
-    elif p == 's' or p == '!':
-
-      if self.attack == 0: # Missed
-        print( '[!] The enemy flew towards you, but it missed.' )
-        print( '[*] You: NO DAMAGE' )
-      if self.attack == 1: # Low attack
-        print( '[!] The enemy flew into you.' )
-        print( f'[*] You: -{ self.damage( 10, 18, entity = "you" ) } HP' )
-      if self.attack == 2: # High attack
-        print( '[!] The enemy flew over you.' )
-        print( '[*] You: NO DAMAGE' )
-
-    # Check if either entity died
-    self.hp_check()
-
-    # Progress attack
-    self.attack_c += ( 1 if self.attack_0 != 1 else -1 )
-    self.attack = self.attack_c % 3
-
-class MonsterSkeleton( Monster ):
-
-  def __init__( self ):
-
-    self.hp = 120
-    self.name = 'Skeleton'
-
-    self.attack = random.choice( ( 0, 1, 2, 3 ) )
-    self.attack_c = 0
-    self.attack_0 = self.attack
-
-  def get_options( self, player_turn, should_print = True ):
-
-    # Player offensive
-    if player_turn:
-      print( '[S] Swing sword (*)' )
-      print( '[J] Jump and swing sword' )
-      print( '[U] Shoot upward' )
-      print( '[R] Shoot rightward' )
-      print( '[L] Shoot leftward' )
-      return ( 's', 'j', 'u', 'r', 'l' )
-
-    # Player defensive
-    else:
-      print( '[J] Jump' )
-      print( '[B] Move backward' )
-      return ( 'j', 'b' )
-
-  # They player's turn is defined here because it depends on the monster's behavior
-  def player_turn( self, p ):
-
-    # Swing sword
-    if p == 's':
-
-      if self.attack == 0: # Deflect
-        print( '[!] You swung your sword at the enemy, but it absorbed your attack.' )
-        print( '[*] Enemy: NO DAMAGE' )
-      if self.attack == 1: # Jump
-        if random.choice( ( True, False ) ):
-          print( '[!] The enemy was about to jump, but you hit it with your sword.' )
-          print( f'[*] Enemy: -{ self.damage( 12, 24 ) } HP' )
-        else:
-          print( '[!] You swung your sword at the enemy, but it jumped over it.' )
-          print( '[*] Enemy: NO DAMAGE' )
-      if self.attack == 2: # Move rightward
-        print( '[!] You swung your sword at the enemy, but it moved rightward.' )
-        print( '[*] Enemy: NO DAMAGE' )
-      if self.attack == 3: # Move leftward
-        print( '[!] You swung your sword at the enemy, but it moved leftward.' )
-        print( '[*] Enemy: NO DAMAGE' )
-
-    # Jump and swing sword
-    if p == 'j':
-
-      if self.attack == 0: # Deflect
-        print( '[!] The enemy remained stationary, so you jumped over it.' )
-        print( '[*] Enemy: NO DAMAGE' )
-      if self.attack == 1: # Jump
-        print( '[!] The enemy jumped, so you jumped and hit it with your sword.' )
-        print( f'[*] Enemy: -{ self.damage( 16, 28 ) } HP' )
-      if self.attack == 2: # Move rightward
-        print( '[!] You jumped and swung, but the enemy dodged rightward.' )
-        print( '[*] Enemy: NO DAMAGE' )
-      if self.attack == 3: # Move leftward
-        print( '[!] You jumped and swung, but the enemy dodged leftward.' )
-        print( '[*] Enemy: NO DAMAGE' )
-
-    # Shoot upward
-    if p == 'u':
-
-      if self.attack == 0: # Deflect
-        print( '[!] The enemy remained stationary, so your arrow missed it.' )
-        print( '[*] Enemy: NO DAMAGE' )
-      if self.attack == 1: # Jump
-        print( '[!] The enemy jumped and was hit by your arrow.' )
-        print( f'[*] Enemy: -{ self.damage( 8, 16 ) } HP' )
-      if self.attack == 2: # Move rightward
-        print( '[!] You shot your arrow upward, but the enemy moved rightward.' )
-        print( '[*] Enemy: NO DAMAGE' )
-      if self.attack == 3: # Move leftward
-        print( '[!] You shot your arrow upward, but the enemy moved leftward.' )
-        print( '[*] Enemy: NO DAMAGE' )
-
-    # Shoot rightward
-    if p == 'r':
-
-      if self.attack == 0: # Deflect
-        print( '[!] The enemy remained stationary, so your arrow missed it.' )
-        print( '[*] Enemy: NO DAMAGE' )
-      if self.attack == 1: # Jump
-        print( '[!] You shot your arrow rightward, but the enemy jumped.' )
-        print( '[*] Enemy: NO DAMAGE' )
-      if self.attack == 2: # Move rightward
-        print( '[!] The enemy moved rightward into your arrow.' )
-        print( f'[*] Enemy: -{ self.damage( 8, 16 ) } HP' )
-      if self.attack == 3: # Move leftward
-        print( '[!] You shot your arrow rightward, but the enemy moved leftward.' )
-        print( '[*] Enemy: NO DAMAGE' )
-
-    # Shoot leftward
-    if p == 'l':
-
-      if self.attack == 0: # Deflect
-        print( '[!] The enemy remained stationary, so your arrow missed it.' )
-        print( '[*] Enemy: NO DAMAGE' )
-      if self.attack == 1: # Jump
-        print( '[!] You shot your arrow leftward, but the enemy jumped.' )
-        print( '[*] Enemy: NO DAMAGE' )
-      if self.attack == 2: # Move rightward
-        print( '[!] You shot your arrow leftward, but the enemy moved rightward.' )
-        print( '[*] Enemy: NO DAMAGE' )
-      if self.attack == 3: # Move leftward
-        print( '[!] The enemy moved leftward into your arrow.' )
-        print( f'[*] Enemy: -{ self.damage( 8, 16 ) } HP' )
-
-    # Check if either entity died
-    self.hp_check()
-
-    # Progress attack
-    self.attack_c += 1
-    self.attack = ( ( 0, 1, 2, 3, 3, 2, 1 )[ self.attack_c % 7 ] + self.attack_0 ) % 4
-
-  # The enemy's turn to attack
-  def turn( self, p ):
-    
-    # Jump
-    if p == 'j':
-
-      if self.attack == 0: # Charge toward
-        print( '[!] The enemy charged toward you, and you jumped over it.' )
-        print( '[*] You: NO DAMAGE' )
-      if self.attack == 1: # Jump on
-        print( '[!] You and the enemy both jumped towards each other.' )
-        print( f'[*] You: -{ self.damage( 18, 28, entity = "you" ) } HP' )
-      if self.attack == 2: # Throw bone
-        print( '[!] The enemy threw a bone at you, and you jumped over it.' )
-        print( '[*] You: NO DAMAGE' )
-      if self.attack == 3: # Throw bone upward
-        print( '[!] The enemy threw a bone upward, and you jumped into it.' )
-        print( f'[*] You: -{ self.damage( 8, 18, entity = "you" ) } HP' )
-    
-    # Move backward
-    if p == 'b':
-
-      if self.attack == 0: # Charge toward
-        print( '[!] The enemy charged toward you, and you didn\t back up far enough.' )
-        print( f'[*] You: -{ self.damage( 20, 40, entity = "you" ) } HP' )
-      if self.attack == 1: # Jump on
-        print( '[!] The enemy tried to jump on you, but you moved backwards.' )
-        print( '[*] You: NO DAMAGE' )
-      if self.attack == 2: # Throw bone
-        print( '[!] The enemy threw a bone, and it hit you.' )
-        print( f'[*] You: -{ self.damage( 8, 18, entity = "you" ) } HP' )
-      if self.attack == 3: # Throw bone upward
-        print( '[!] The enemy threw a bone upward, and it missed you.' )
-        print( '[*] You: NO DAMAGE' )
-
-    # Escape
-    if p == '!':
-
-      if self.attack == 0: # Charge toward
-        print( '[!] The enemy charged toward you.' )
-        print( f'[*] You: -{ self.damage( 20, 40, entity = "you" ) } HP' )
-      if self.attack == 1: # Jump on
-        print( '[!] The enemy jumped on you.' )
-        print( f'[*] You: -{ self.damage( 24, 48, entity = "you" ) } HP' )
-      if self.attack == 2: # Throw bone
-        print( '[!] The enemy threw a bone, and it hit you.' )
-        print( f'[*] You: -{ self.damage( 8, 18, entity = "you" ) } HP' )
-      if self.attack == 3: # Throw bone upward
-        print( '[!] The enemy threw a bone upward, and it missed you.' )
-        print( '[*] You: NO DAMAGE' )
-
-    # Check if either entity died
-    self.hp_check()
-
-    # Progress attack
-    self.attack_c += 1
-    self.attack = ( ( 0, 1, 2, 3, 3, 2, 1 )[ self.attack_c % 7 ] + self.attack_0 ) % 4
+  def advance_move( self ):
+
+    if self.name == 'slime':
+      self.move_c += 1
+      if self.move_c % 2 == 0:
+        self.move = ( 1 - self.move )
+
+    elif self.name == 'zombie':
+      self.move_c += 1
+      if self.move_c % 3 == 0:
+        self.move = 1 - self.move
+
+    elif self.name == 'demon_eye':
+      self.move_c += 1
+      self.move = ( self.move_0 ) if ( self.move_c % 6 in ( 0, 2, 3 ) ) else ( 1 - self.move_0 )
+
+    elif self.name == 'cave_bat':
+      self.move_c += ( 1 if self.move_0 != 1 else -1 )
+      self.move = self.move_c % 3
+
+    elif self.name == 'skeleton':
+      self.move_c += 1
+      self.move = ( ( 0, 1, 2, 3, 3, 2, 1 )[ self.move_c % 7 ] + self.move_0 ) % 4
+
+    elif self.name == 'undead_miner':
+      self.move_c += 1
+      self.move = ( self.move_0 ) if ( self.move_c % 5 == 0 ) else ( 1 - self.move_0 )
 
 # Switches rooms
 def goto_room( room, arg = '' ):
@@ -891,10 +551,9 @@ ITEM_META = [
 
 # GLOBAL CONSTANTS
 DEBUG = True
-SHOW_PROG = False
+SHOW_PROG = True
 AIR_BLOCKS = [ ' ', 'l', 'L' ]
 ITEM_BLOCKS = { 'g': I_GRASS, 's': I_STONE, 'w': I_WOOD, 'i': I_IRON_ORE, 'S': I_SILVER_ORE, 'G': I_GOLD_ORE }
-MONSTERS = [ 'slime', 'zombie', 'demon_eye', 'cave_bat', 'skeleton' ]
 
 # GLOBAL VARIABLES
 g_data = {}
@@ -987,41 +646,48 @@ def data_char_init( name ):
 
   # Open/write to file
   file = open( 'c_' + name + '.txt', 'w' )
+  file.write( '\nversion: 1.0' )
   file.write( 'hp: 100,100\n' )
   file.write( 'items: 1:1,2:1,' ) # Defaults to sword/pickaxe
   for i in range( 14 ):
     file.write( '0:0' + ( ',' if i != 15 else '' ) )
   file.write( '\ndeaths: 0' )
   file.write( '\nplay_time: 0' )
-  file.write( '\nversion: 1.0' )
 
 # Load a character file with a given name
 def data_char_load( name ):
 
   global g_hp, g_hp_max, g_items, g_deaths, g_versions, g_play_time
 
-  # Split file into statements/read HP data
+  # Split file into statements
   file = open( 'c_' + name + '.txt', 'r' ).read().split( '\n' )
-  g_hp = int( file[0][4:].split( ',' )[0] )
-  g_hp_max = int( file[0][4:].split( ',' )[1] )
+
+  # Read version
+  g_versions[0] = file[0][9:]
+
+  # Read HP data
+  g_hp = int( file[1][4:].split( ',' )[0] )
+  g_hp_max = int( file[1][4:].split( ',' )[1] )
 
   # Setup item array
   g_items = []
-  t = file[1][7:].split( ',' )
+  t = file[2][7:].split( ',' )
   for i in range( 16 ):
     g_items.append( [ int( t[i].split( ':' )[0] ), int( t[i].split( ':' )[1] ) ] )
 
   update_inv( 0, 0, mode = '!' ) # Properly organizes inventory
 
   # Other stuff
-  g_deaths = int( file[2][8:] )
-  g_versions[0] = file[3][9:]
+  g_deaths = int( file[3][8:] )
   g_play_time = int( file[4][11:] )
 
 # Write back to the character file if something changed
 def data_char_update( name ):
 
   file = open( 'c_' + name + '.txt', 'w' )
+
+  # Write version
+  file.write( f'version: { g_versions[0] }\n' )
 
   # Write HP data
   file.write( f'hp: { g_hp },{ g_hp_max }\n' )
@@ -1033,7 +699,6 @@ def data_char_update( name ):
 
   # Other stuff
   file.write( f'\ndeaths: { g_deaths }' ) 
-  file.write( f'\nversion: { g_versions[0] }' )
   file.write( f'\nplay_time: { int( g_play_time ) }' )
 
 def generate_world( size, seed ):
@@ -1219,9 +884,9 @@ def data_world_init( name, seed ):
   generate_world( size, seed )
 
   # Write non-tile data
+  file.write( 'version: 1.0\n')
   file.write( f'size: { size.x },{ size.y }\n')
   file.write( f'seed: { seed }\n')
-  file.write( 'version: 1.0\n')
   file.write( f'player_pos: { g_pos.x },{ g_pos.y }\n' )
 
   # Write tile data
@@ -1237,10 +902,12 @@ def data_world_load( name ):
   # Split file into statements
   file = open( 'w_' + name + '.txt', 'r' ).read().split( '\n' )
 
+  # Read version
+  g_versions[1] = file[0][9:]
+
   # Read basic positional data
-  g_world_size = V2( int( file[0][6:].split( ',' )[0] ), int( file[0][6:].split( ',' )[1] ) )
-  g_seed = int( file[1][6:] )
-  g_versions[1] = file[2][9:]
+  g_world_size = V2( int( file[1][6:].split( ',' )[0] ), int( file[1][6:].split( ',' )[1] ) )
+  g_seed = int( file[2][6:] )
   g_pos = V2( int( file[3][12:].split( ',' )[0] ), int( file[3][12:].split( ',' )[1] ) )
 
   # Read tile data
@@ -1259,9 +926,9 @@ def data_world_update( name ):
   file = open( 'w_' + name + '.txt', 'w' )
 
   # Write non-tile data
+  file.write( f'version: { g_versions[1] }\n')
   file.write( f'size: { g_world_size.x },{ g_world_size.y }\n')
   file.write( f'seed: { g_seed }\n')
-  file.write( f'version: { g_versions[1] }\n')
   file.write( f'player_pos: { g_pos.x },{ g_pos.y }\n' )
 
   # Write tile data
@@ -1915,7 +1582,7 @@ def room_scene( arg = '' ):
       elif p[2:8] == 'fight ':
 
         # Check monster ID
-        if p[8:] not in MONSTERS:
+        if p[8:] not in Monster.TYPES:
           print( '[#] Invalid monster ID.' )
         else:
           start_fight( p[8:] )
@@ -2455,15 +2122,10 @@ def room_crafting( arg = '' ):
 def start_fight( monster_id ):
   
   global g_monster
-  if monster_id == 'slime': g_monster = MonsterSlime()
-  elif monster_id == 'zombie': g_monster = MonsterZombie()
-  elif monster_id == 'demon_eye': g_monster = MonsterDemonEye()
-  elif monster_id == 'cave_bat': g_monster = MonsterCaveBat()
-  elif monster_id == 'skeleton': g_monster = MonsterSkeleton()
-  else: g_monster = MonsterSlime()
+  g_monster = Monster( monster_id )
   
   print_line()
-  input( f'You encountered a { g_monster.name }! ' )
+  input( f"You encountered a { g_monster.name.replace( '_', ' ' ).title() }! " )
   
   goto_room( room_fight )
 
@@ -2474,7 +2136,7 @@ def room_fight():
   # PLAYER TURN
   print_line()
   print( f'You: { g_hp } HP' )
-  print( f'{ g_monster.name }: { g_monster.hp } HP' )
+  print( f"{ g_monster.name.replace( '_', ' ' ).title() }: { g_monster.hp } HP" )
   allowed_inputs = g_monster.get_options( player_turn = True )
   print( '[*] Pause' )
 
@@ -2498,7 +2160,7 @@ def room_fight():
   # ENEMY TURN
   print_line()
   print( f'You: { g_hp } HP' )
-  print( f'{ g_monster.name }: { g_monster.hp } HP' )
+  print( f"{ g_monster.name.replace( '_', ' ' ).title() }: { g_monster.hp } HP" )
   allowed_inputs = g_monster.get_options( player_turn = False )
   print( '[!] Attempt escape' )
   print( '[*] Pause' )
@@ -2513,18 +2175,18 @@ def room_fight():
 
     # Escape
     elif p == '!':
-      if random.choice( ( False, False, False ) ):
+      if random.choice( ( True, False, False ) ):
         print( '[!] You successfully escaped.' )
         input( '[!] Press enter to exit the fight. ' )
         goto_room( room_scene )
       else:
         print( '[!] Your attempt to escape was unsuccessful.' )
-        g_monster.turn( '!' )
+        g_monster.monster_turn( '!' )
       break
 
     # Turn
     elif p in allowed_inputs:
-      g_monster.turn( p )
+      g_monster.monster_turn( p )
       break
 
     # Invalid input
