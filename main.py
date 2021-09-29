@@ -647,7 +647,7 @@ ITEM_META = [
 # GLOBAL CONSTANTS
 DEBUG = True
 SHOW_PROG = False
-AIR_BLOCKS = [ ' ', 'l', 'L' ]
+AIR_BLOCKS = [ ' ', 'l', 'L', 'c', 'C' ]
 ITEM_BLOCKS = { 'g': I_GRASS, 's': I_STONE, 'w': I_WOOD, 'i': I_IRON_ORE, 'S': I_SILVER_ORE, 'G': I_GOLD_ORE }
 
 # GLOBAL VARIABLES
@@ -1103,7 +1103,7 @@ def data_world_init( name, seed ):
 # Load a world file with a given name
 def data_world_load( name ):
 
-  global g_pos, g_world_size, g_seed, g_tile_data, g_show_help, g_slot, g_versions, g_play_time_last
+  global g_pos, g_world_size, g_seed, g_tile_data, g_tile_special, g_show_help, g_slot, g_versions, g_play_time_last
 
   # Split file into statements
   file = open( 'w_' + name + '.txt', 'r' ).read().split( '\n' )
@@ -1127,7 +1127,7 @@ def data_world_load( name ):
   for l in file[ 4 + g_world_size.y:len( file ) ]:
 
     # Exit if not data
-    if not ( len( l ) > 0 and l[0] == 'S' ): break
+    if not ( len( l ) > 0 and l[0] == 'S' ): continue
 
     t = ' : '.join( l.split( ': ' )[0][1:].split( ':' ) )
     g_tile_special[ t ] = []
@@ -1152,6 +1152,8 @@ def data_world_info( name ):
 # Write back to the world file if something changed
 def data_world_update( name ):
 
+  global g_tile_special
+
   file = open( 'w_' + name + '.txt', 'w' )
 
   # Write non-tile data
@@ -1170,7 +1172,6 @@ def data_world_update( name ):
 
     file.write( 'S' + t.replace( ' ', '' ) + ': ' )
     t1 = [] # Empty list to hold temp data
-    print( g_tile_special[t] )
     for i in g_tile_special[t]: # For every list within tile data
       for j in range( len( i ) ):
         i[j] = str( i[j] ) # Cast every entry to str
@@ -1605,7 +1606,10 @@ def room_scene( arg = '' ):
         print( '[?] (Accepted directions are "left", "right", "up", and "down".)' )
       elif p[2:] == 'c':
         print( '[?] Syntax: c' )
-        print( '[?] Effect: Opens the nearest chest within 5 blocks of the player.' )
+        print( '[?] Effect: Opens a chest within the same block as the player.' )
+        print( '[?] Syntax: c <x> <y>' )
+        print( '[?] Effect: Opens a chest x units right of the player and y units below the player.' )
+        print( '[?] (Maximum is 4 blocks away in any direction.)' )
       elif p[2:] == '$' and DEBUG:
         print( '[?] Syntax: $ <command> <arguments>' )
         print( '[?] Effect: Runs a sub-command.' )
@@ -1797,6 +1801,40 @@ def room_scene( arg = '' ):
       else:
         print( '[#] Enter either a direction or a coordinate pair.' )
 
+    elif p == 'c' or p[0:2] == 'c ':
+
+      # Get coordinates if they're supplied
+      if len( p ) > 1:
+
+        # Attempt cast
+        try:
+          t = V2( int( p[2:].split( ' ' )[0] ), int( p[2:].split( ' ' )[1] ) )
+        except ValueError:
+          print( '[#] Enter 2 numbers.' )
+          t = 'ERROR'
+        else:
+
+          # Check range
+          t1 = ( -4 <= t.x <= 4 )
+          t2 = ( -4 <= t.y <= 4 )
+          if not ( t1 and t2 ):
+            print( f"[#] { '' if t1 else 'X' }{ '' if t1 or t2 else ' and ' }{ '' if t2 else 'Y' } coordinate{ '' if t1 or t2 else 's' } out of range. (Valid range: [-4, 4].)" )
+            t = 'ERROR'
+
+      # Else default to (0, 0)
+      else:
+        t = V2( 0, 0 )
+
+      # If coordinates are correct, try to open chest
+      if t != 'ERROR':
+
+        if get_tile( g_pos.copy().a( t ) ) != 'c':
+          print( '[#] There is not a chest at the block specified.' )
+
+        # Success
+        else:
+          goto_room( room_chest, f'0,{ g_pos.copy().a( t ).x },{ g_pos.copy().a( t ).y }' )
+
     # Debug command (requires debug mode)
     elif p == '$' and DEBUG:
       print( '[#] Must supply a sub-command.')
@@ -1809,7 +1847,7 @@ def room_scene( arg = '' ):
 
       elif p[2:7] == 'jump ' or p[2:8] == 'shift ':
 
-        # Attempt casting coordiantes
+        # Attempt casting coordinates
         try:
           t = V2( int( p[ ( 7 if p[2] == 'j' else 8 ): ].split( ' ' )[0] ), int( p[ ( 7 if p[2] == 'j' else 8 ): ].split( ' ' )[1] ) )
           if p[2] == 's':
@@ -1949,7 +1987,8 @@ def update_inv( item_id, amount, mode = 'p', slot = 0 ):
     for i in range( 16 ):
       if g_items[i][0] == item_id and g_items[i][1] > 0:
         g_items[i][1] += amount
-        break
+        data_char_update( g_cname )
+        return True
 
     else:
 
@@ -1958,7 +1997,10 @@ def update_inv( item_id, amount, mode = 'p', slot = 0 ):
         if g_items[i][1] == 0:
           g_items[i][0] = item_id
           g_items[i][1] = amount
-          break
+          data_char_update( g_cname )
+          return True
+
+    return False
 
   # Removal mode
   # (Returns the # of items that were able to be removed)
@@ -2025,17 +2067,17 @@ def chest_modify( x, y, item_id, amount, mode = 'i' ):
 
     # The same as the code for update_inv()
     for i in range( 10 ):
-      if g_tile_special[ str( x ) + " : " + str( y ) ][i][0] == item_id and g_tile_special[ str( x ) + " : " + str( y ) ][1] > 0:
+      if g_tile_special[ str( x ) + " : " + str( y ) ][i][0] == item_id and g_tile_special[ str( x ) + " : " + str( y ) ][i][1] > 0:
         g_tile_special[ str( x ) + " : " + str( y ) ][i][1] += amount
-        break
+        return True
 
-    else:
+    for i in range( 10 ):
+      if g_tile_special[ str( x ) + " : " + str( y ) ][i][1] == 0:
+        g_tile_special[ str( x ) + " : " + str( y ) ][i][0] = item_id
+        g_tile_special[ str( x ) + " : " + str( y ) ][i][1] = amount
+        return True
 
-      for i in range( 10 ):
-        if g_tile_special[ str( x ) + " : " + str( y ) ][i][1] == 0:
-          g_tile_special[ str( x ) + " : " + str( y ) ][i][0] = item_id
-          g_tile_special[ str( x ) + " : " + str( y ) ][i][1] = amount
-          break
+    return False
 
   # Remove
   elif mode == 'r':
@@ -2469,6 +2511,158 @@ def room_crafting( arg = '' ):
 
       else:
         print( 'This will never happen.' )
+
+    # Quit
+    elif p == 'q':
+      goto_room( room_scene )
+
+    # Invalid input
+    else:
+      print( '[#] Unknown command.' )
+
+# Chest UI
+def room_chest( arg = '' ):
+
+  global g_items, g_tile_special
+
+  # Make sure coordinates are supplied/valid
+  if not ( len( arg.split( ',' ) ) == 3 ):
+    print( 'ERROR: Chest data not supplied.' )
+    goto_room( 0 )
+
+  k = arg.split( ',' )[1] + ' : ' + arg.split( ',' )[2]
+  if k not in g_tile_special:
+    print( 'ERROR: Chest not at block.' )
+    goto_room( 0 )
+
+  # Args can be set to 1 to avoid re-printing room data
+  if not ( len( arg ) > 0 and arg[0] == '1' ):
+
+    # Print items in a grid-like pattern
+    print_line()
+    print( 'Chest:' )
+    for i in range( 10 ):
+      j = i // 2 + ( i % 2 ) * 5
+      t = f"({ '1234567890'[j] }) "
+      t += ( item_meta( g_tile_special[k][j][0] ) if g_tile_special[k][j][1] != 0 else '...' )
+      t += f"  x{ g_tile_special[k][j][1] }" if g_tile_special[k][j][1] != 0 else ''
+      t = t[:38]
+      print( t + ' ' * ( 40 - len( t ) ), end = ( '' if j < 5 else '\n' ) )
+    print()
+
+    # Also print inventory for reference
+    print( 'Inventory:' )
+    for i in range( 16 ):
+      j = i // 2 + ( i % 2 ) * 8
+      t = f"({ '1234567890ABCDEF'[j] }) "
+      t += ( '* ' if g_slot == j else '' ) + ( item_meta( j, c = 1 ) if g_items[j][1] != 0 else '...' )
+      t += f"  x{ g_items[j][1] }" if g_items[j][1] != 0 else ''
+      t = t[:38]
+      print( t + ' ' * ( 40 - len( t ) ), end = ( '' if j < 8 else '\n' ) )
+    print()
+
+    print( '[I] Insert item' )
+    print( '[T] Take item' )
+    print( '[Q] Close' )
+
+  while True:
+    p = input( '> ' ).lower()
+
+    # Insert item
+    if p == 'i':
+
+      # Make sure inventory isn't empty
+      for i in range( 16 ):
+        if g_items[i][1] != 0:
+          break
+      else:
+        print( '[#] Your inventory is empty.' )
+        goto_room( room_chest, '1' + arg[1:] )
+
+      # Get slot:
+      print( 'Enter the item you want to put in the chest:' )
+      while True:
+        p = input( '> ' ).upper()
+
+        # Make sure it matches a slot
+        if p not in list( '1234567890ABCDEF' ):
+          print( '[#] Enter a number from 0-9 or a letter from A-F.' )
+
+        # Make sure it has an item in it
+        elif g_items[ list( '1234567890ABCDEF' ).index( p ) ][1] == 0:
+          print( '[#] This slot is empty.' )
+
+        else:
+
+          # Get count
+          t = list( '1234567890ABCDEF' ).index( p )
+          print( 'Enter how much you want to put in: ' )
+          while True:
+            p = input( '> ' ).lower()
+
+            # Attempt cast
+            try:
+              p = abs( int( p ) )
+            except ValueError:
+              print( '[#] Enter a number.' )
+            else:
+
+              # Attempt to insert item (reload chest)
+              if chest_modify( int( k.split( ' : ' )[0] ), int( k.split( ' : ' )[1] ), g_items[t][0], min( g_items[t][1], p ) ):
+                g_items[t][1] -= min( g_items[t][1], p )
+                goto_room( room_chest, '0' + arg[1:] )
+
+              else:
+                print( '[#] This chest is full.' )
+                goto_room( room_chest, '1' + arg[1:] )
+
+    # Take item
+    elif p == 't':
+
+      # Make sure chest isn't empty
+      for i in range( 10 ):
+        if g_tile_special[k][i][1] != 0:
+          break
+      else:
+        print( '[#] This chest is empty.' )
+        goto_room( room_chest, '1' + arg[1:] )
+
+      # Get slot:
+      print( 'Enter the item you want to take:' )
+      while True:
+        p = input( '> ' ).upper()
+
+        # Make sure it matches a slot
+        if p not in list( '1234567890' ):
+          print( '[#] Enter a number from 0-9.' )
+
+        # Make sure it has an item in it
+        elif g_tile_special[k][ list( '1234567890' ).index( p ) ][1] == 0:
+          print( '[#] This slot is empty.' )
+
+        else:
+
+          # Get count
+          t = list( '1234567890' ).index( p )
+          print( 'Enter how much you want to take: ' )
+          while True:
+            p = input( '> ' ).lower()
+
+            # Attempt cast
+            try:
+              p = abs( int( p ) )
+            except ValueError:
+              print( '[#] Enter a number.' )
+            else:
+
+              # Attempt to take item (reload chest)
+              if update_inv( g_tile_special[k][t][0], min( g_tile_special[k][t][1], p ) ):
+                g_tile_special[k][t][1] -= min( g_tile_special[k][t][1], p )
+                goto_room( room_chest, '0' + arg[1:] )
+
+              else:
+                print( '[#] Your inventory is full.' )
+                goto_room( room_chest, '1' + arg[1:] )
 
     # Quit
     elif p == 'q':
