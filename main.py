@@ -609,14 +609,14 @@ I_ARROW = 21
 I_F_ARROW = 22
 I_PLATFORM = 23
 I_CHEST = 24
-I_ACORN = 25
+I_SUS_EYE = 25
 I_GRENADE = 26
-I_BOMB = 27
+I_HEALTH_POTION = 27
 
 ITEM_META = [
   [ 'NULL', 'An item you shouldn\'t have' ],
   [ 'Copper Shortsword', 'Better than nothing!' ],
-  [ 'Copper Pickaxe', 'The best pick in the game. (Also the only pick in the game).' ],
+  [ 'Copper Pickaxe', 'The best pick in the game.\n(Also the only pick in the game).' ],
   [ 'Grass', 'Not useful for much, but you\'ll acquire it anyway.' ],
   [ 'Stone', 'The most prevalent material in the world.' ],
   [ 'Wood', 'A reliable building block.' ],
@@ -639,9 +639,9 @@ ITEM_META = [
   [ 'Flaming Arrow', 'Description' ],
   [ 'Wooden Platform', 'Description' ],
   [ 'Chest', 'Description' ],
-  [ 'Acorn', 'Description' ],
+  [ 'Sus Eye', 'Description' ],
   [ 'Grenade', 'Description' ],
-  [ 'Bomb', 'Description' ]
+  [ 'Healing Potion', 'Usable anytime.\nGrants +100 HP.' ]
 ]
 
 # GLOBAL CONSTANTS
@@ -657,6 +657,8 @@ g_wname = ''
 g_pos = V2( 0, 0 )
 g_view = V2( 0, 0 )
 g_world_size = V2( 0, 0 )
+g_tile_data = []
+g_tile_special = {}
 g_seed = 0
 g_hp = 0
 g_hp_max = 0
@@ -666,7 +668,6 @@ g_deaths = 0
 g_versions = [ '', '' ]
 g_play_time = 0
 g_play_time_last = 0
-g_tile_data = []
 g_show_help = True
 g_tmap = {
   'player': 'Δ',
@@ -826,10 +827,11 @@ def generate_world( size, seed ):
   CHESTS = True
   CHESTS_FREQ = 8
 
-  global g_tile_data, g_pos
+  global g_tile_data, g_tile_special, g_pos
 
   # Clean slate
   g_tile_data = ''
+  g_tile_special = {}
   progress = 0
   random.seed( seed )
   print( 'Generating World:' )
@@ -1009,9 +1011,22 @@ def generate_world( size, seed ):
             for xx in range( o.x - 10, o.x + 11 ):
               g_tile_data[ xy2c( xx, yy, size.x ) ] = ( 'w' if xx in ( o.x - 10, o.x + 10 ) or yy in ( o.y - 8, o.y + 1 ) else ' ' ) # Place outline / air pocket
           g_tile_data[ xy2c( *o.l(), size.x ) ] = 'c' # Place chest
+
+          # CHEST INFO
+          chest_create( *o.l() )
+
+          t = random.choice( ( ( I_SUS_EYE, 1, 1 ), ( I_HEALTH_POTION, 1, 1 ), ( I_GRENADE, 4, 7 ) ) )
+          chest_modify( *o.l(), t[0], random.randint( t[1], t[2] ), mode = 'i' ) # Random item for slot 1
+
+          t = random.choice( ( ( I_IRON_BAR, 3, 5 ), ( I_SILVER_BAR, 3, 5 ), ( I_GOLD_BAR, 3, 5 ) ) )
+          chest_modify( *o.l(), t[0], random.randint( t[1], t[2] ), mode = 'i' ) # Random bar for slot 1
+
+          t = random.choice( ( ( I_TORCH, 10, 15 ), ( I_ARROW, 15, 25 ), ( I_F_ARROW, 8, 15 ) ) )
+          chest_modify( *o.l(), t[0], random.randint( t[1], t[2] ), mode = 'i' ) # Random bar for slot 1
+
           break
 
-    progress = print_progress( progress, CHESTS_FREQ, 5, 'Generating chest rooms' ) # Update progress
+      progress = print_progress( progress, CHESTS_FREQ, 5, 'Generating chest rooms' ) # Update progress
   else:
     progress = print_progress( progress, 1, 5, 'Generating chest rooms' ) # Autofill progress if skipped
 
@@ -1073,6 +1088,18 @@ def data_world_init( name, seed ):
     file.write( ''.join( g_tile_data[ ( j * size.x ):( ( j + 1 ) * size.x ) ] ) )
     file.write( '\n' )
 
+  # Write special tile data
+  for t in g_tile_special:
+
+    file.write( 'S' + t.replace( ' ', '' ) + ': ' )
+    t1 = [] # Empty list to hold temp data
+
+    for i in g_tile_special[t]: # For every list within tile data
+      for j in range( len( i ) ):
+        i[j] = str( i[j] ) # Cast every entry to str
+      t1.append( ':'.join( i ) )
+    file.write( ','.join( t1 ) + '\n' )
+
 # Load a world file with a given name
 def data_world_load( name ):
 
@@ -1094,6 +1121,18 @@ def data_world_load( name ):
   for j in range( g_world_size.y ):
     g_tile_data += file[4 + j]
   g_tile_data = list( g_tile_data )
+
+  # Read special tile data
+  g_tile_special = {}
+  for l in file[ 4 + g_world_size.y:len( file ) ]:
+
+    # Exit if not data
+    if not ( len( l ) > 0 and l[0] == 'S' ): break
+
+    t = ' : '.join( l.split( ': ' )[0][1:].split( ':' ) )
+    g_tile_special[ t ] = []
+    for i in l.split( ': ' )[1].split( ',' ):
+      g_tile_special[ t ].append( [ int( i.split( ':' )[0] ), int( i.split( ':' )[1] ) ] )
 
   g_show_help = True # Shows a help message on your first turn in the world
   g_slot = 0 # Reset selected slot
@@ -1125,6 +1164,18 @@ def data_world_update( name ):
   for j in range( g_world_size.y ):
     file.write( ''.join( g_tile_data[ ( j * g_world_size.x ):( ( j + 1 ) * g_world_size.x ) ] ) )
     file.write( '\n' )
+
+  # Write special tile data
+  for t in g_tile_special:
+
+    file.write( 'S' + t.replace( ' ', '' ) + ': ' )
+    t1 = [] # Empty list to hold temp data
+    print( g_tile_special[t] )
+    for i in g_tile_special[t]: # For every list within tile data
+      for j in range( len( i ) ):
+        i[j] = str( i[j] ) # Cast every entry to str
+      t1.append( ':'.join( i ) )
+    file.write( ','.join( t1 ) + '\n' )
 
 # All room functions should be passed into the goto_room() function as a pointer object
 # The starting room
@@ -1407,8 +1458,16 @@ def room_world_create():
     elif name in g_data[ 'world_list' ]:
       print( '[#] This world already exists.' )
 
-    # Continue to other options
     else:
+
+      # Filter name
+      name = list( name )
+      for i in range( len( name ) ):
+        if name[i] in [ '/', '\\', '*', '?', '"', '<', '>', '|' ]:
+          name[i] = '_'
+      name = ''.join( name )
+
+      # Continue to other options
       break
 
   # Get seed
@@ -1492,8 +1551,10 @@ def room_scene( arg = '' ):
       print( '[W] Wait' )
       print( '[I] Inventory' )
       print( '[S] Select Item' )
+      print( '[U] Use current item' )
       print( '[B] Break' )
       print( '[P] Break' )
+      print( '[C] Use Chest' )
       if DEBUG: print( '[$] Debug' )
       print( '[*] Pause' )
 
@@ -1524,20 +1585,27 @@ def room_scene( arg = '' ):
         print( '[?] Syntax: s <slot ID>' )
         print( '[?] Effect: Selects the item in a given slot.' )
         print( '[?] (Open your inventory to check slot IDs.)' )
+      elif p[2:] == 'u':
+        print( '[?] Syntax: u' )
+        print( '[?] Effect: Uses the currently selected item.' )
+        print( '[?] Effect: (Most items don\'t have a use function).' )
       elif p[2:] == 'b':
         print( '[?] Syntax: b <x> <y>' )
-        print( '[?] Breaks the block x units right of the player and y units below the player.' )
+        print( '[?] Effect: Breaks the block x units right of the player and y units below the player.' )
         print( '[?] (Maximum is 4 blocks away in any direction.)' )
         print( '[?] Syntax: b <direction>' )
-        print( '[?] Breaks the block 1 unit away from the player in the specified direction.' )
+        print( '[?] Effect: Breaks the block 1 unit away from the player in the specified direction.' )
         print( '[?] (Accepted directions are "left", "right", "up", and "down".)' )
       elif p[2:] == 'p':
         print( '[?] Syntax: p <x> <y>' )
-        print( '[?] Places the selected block x units right of the player and y units below the player.' )
+        print( '[?] Effect: Places the selected block x units right of the player and y units below the player.' )
         print( '[?] (Maximum is 4 blocks away in any direction.)' )
         print( '[?] Syntax: p <direction>' )
-        print( '[?] Places the selected block 1 unit away from the player in the specified direction.' )
+        print( '[?] Effect: Places the selected block 1 unit away from the player in the specified direction.' )
         print( '[?] (Accepted directions are "left", "right", "up", and "down".)' )
+      elif p[2:] == 'c':
+        print( '[?] Syntax: c' )
+        print( '[?] Effect: Opens the nearest chest within 5 blocks of the player.' )
       elif p[2:] == '$' and DEBUG:
         print( '[?] Syntax: $ <command> <arguments>' )
         print( '[?] Effect: Runs a sub-command.' )
@@ -1661,6 +1729,26 @@ def room_scene( arg = '' ):
         g_slot = list( '1234567890abcdef' ).index( p[2:] )
         print( f'[!] Selected "{ item_meta( g_slot, c = 1 ) }".' if g_items[ g_slot ][1] > 0 else '[!] Cleared selection.' )
         goto_room( room_scene )
+
+    # Use
+    elif p == 'u':
+
+      USABLES = [ I_SUS_EYE ]
+
+      # Check if nothing is selected
+      if g_items[ g_slot ][1] <= 0:
+        print( '[#] You don\'t currently have an item selected.' )
+
+      # Check if item has no function
+      elif g_items[ g_slot ][ 0 ] not in USABLES:
+        print( '[#] This item has no "use" functionality.' )
+
+      # Do item-specific use actions
+      else:
+
+        if g_items[ g_slot ][ 0 ] == I_SUS_EYE:
+          update_inv( I_SUS_EYE, 1, 'r' )
+          # Encounter eye of Cthulhu here
 
     # Break
     elif p == 'b':
@@ -1918,6 +2006,64 @@ def update_inv( item_id, amount, mode = 'p', slot = 0 ):
 
   # Update character file
   data_char_update( g_cname )
+
+# Create new (empty) chest
+def chest_create( x, y ):
+
+  global g_tile_special
+
+  g_tile_special[ str( x ) + " : " + str( y ) ] = []
+  for i in range( 10 ):
+    g_tile_special[ str( x ) + " : " + str( y ) ].append( [ 0, 0 ] )
+
+def chest_modify( x, y, item_id, amount, mode = 'i' ):
+
+  global g_tile_special
+
+  # Insert
+  if mode == 'i':
+
+    # The same as the code for update_inv()
+    for i in range( 10 ):
+      if g_tile_special[ str( x ) + " : " + str( y ) ][i][0] == item_id and g_tile_special[ str( x ) + " : " + str( y ) ][1] > 0:
+        g_tile_special[ str( x ) + " : " + str( y ) ][i][1] += amount
+        break
+
+    else:
+
+      for i in range( 10 ):
+        if g_tile_special[ str( x ) + " : " + str( y ) ][i][1] == 0:
+          g_tile_special[ str( x ) + " : " + str( y ) ][i][0] = item_id
+          g_tile_special[ str( x ) + " : " + str( y ) ][i][1] = amount
+          break
+
+  # Remove
+  elif mode == 'r':
+
+    # Try to remove
+    for i in range( 10 ):
+      if g_tile_special[ str( x ) + " : " + str( y ) ][i][0] == item_id:
+        if g_tile_special[ str( x ) + " : " + str( y ) ][i][1] >= amount:
+
+          g_tile_special[ str( x ) + " : " + str( y ) ][i][1] -= amount
+          data_char_update( g_cname )
+          return amount
+
+        elif g_tile_special[ str( x ) + " : " + str( y ) ][i][1] > 0:
+
+          t = g_tile_special[ str( x ) + " : " + str( y ) ][i][1]
+          g_tile_special[ str( x ) + " : " + str( y ) ][i][1] = 0
+          data_char_update( g_cname )
+          return t
+
+    # Failed to remove
+    return 0
+
+def chest_remove( x, y ):
+
+  global g_tile_special
+
+  g_tile_special.pop( str( x ) + " : " + str( y ) )
 
 # Break a block
 def break_block( x, y ):
@@ -2344,7 +2490,7 @@ def start_fight( monster_id ):
 
 def room_fight():
 
-  global g_monster
+  global g_monster, g_hp
 
   # PLAYER TURN
   print_line()
@@ -2375,6 +2521,8 @@ def room_fight():
   print( f'You: { g_hp } HP' )
   print( f"{ g_monster.name.replace( '_', ' ' ).title() }: { g_monster.hp } HP" )
   allowed_inputs = g_monster.get_options( player_turn = False )
+  if update_inv( I_HEALTH_POTION, 0, 't' ) >= 1:
+    print( '[H] Drink health potion' )
   print( '[!] Attempt escape' )
   print( '[*] Pause' )
 
@@ -2397,6 +2545,14 @@ def room_fight():
         g_monster.monster_turn( '!' )
       break
 
+    # Heal
+    elif p == 'h' and update_inv( I_HEALTH_POTION, 0, 't' ) >= 1:
+      print( '[!] You used a healing potion.' )
+      print( f'[*] YOU: +{ min( g_hp + 100, g_hp_max ) - g_hp } HP' )
+      g_hp = min( g_hp + 100, g_hp_max )
+      g_monster.monster_turn( '!' )
+      break
+
     # Turn
     elif p in allowed_inputs:
       g_monster.monster_turn( p )
@@ -2405,6 +2561,9 @@ def room_fight():
     # Invalid input
     else:
       print( '[#] Unknown command.' )
+
+  # Save player data
+  data_char_update( g_cname )
 
   goto_room( room_fight )
 
