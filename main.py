@@ -79,6 +79,7 @@ def char2tile( c ):
   if c == 'S': return g_tmap[ 'silver' ]
   if c == 'G': return g_tmap[ 'gold' ]
   if c == 'w': return g_tmap[ 'wood' ]
+  if c == 'p': return g_tmap[ 'platform' ]
   if c == 'c': return g_tmap[ 'chest' ]
   if c == 'C': return g_tmap[ 'crystal' ]
   return '?'
@@ -612,6 +613,7 @@ I_CHEST = 24
 I_SUS_EYE = 25
 I_GRENADE = 26
 I_HEALTH_POTION = 27
+I_CRYSTAL = 28
 
 ITEM_META = [
   [ 'NULL', 'An item you shouldn\'t have' ],
@@ -641,14 +643,16 @@ ITEM_META = [
   [ 'Chest', 'Description' ],
   [ 'Sus Eye', 'Description' ],
   [ 'Grenade', 'Description' ],
-  [ 'Healing Potion', 'Usable anytime.\nGrants +100 HP.' ]
+  [ 'Healing Potion', 'Usable anytime.\nGrants +100 HP.' ],
+  [ 'Life Crystal', 'Increases MHP by 20 HP.' ]
 ]
 
 # GLOBAL CONSTANTS
 DEBUG = True
 SHOW_PROG = False
 AIR_BLOCKS = [ ' ', 'l', 'L', 'c', 'C' ]
-ITEM_BLOCKS = { 'g': I_GRASS, 's': I_STONE, 'w': I_WOOD, 'i': I_IRON_ORE, 'S': I_SILVER_ORE, 'G': I_GOLD_ORE }
+ITEM_BLOCKS = { 'g': I_GRASS, 's': I_STONE, 'w': I_WOOD, 'l': I_WOOD, 'i': I_IRON_ORE, 'S': I_SILVER_ORE, 'G': I_GOLD_ORE,
+  'p': I_PLATFORM, 'c': I_CHEST, 'C': I_CRYSTAL }
 
 # GLOBAL VARIABLES
 g_data = {}
@@ -1178,6 +1182,12 @@ def data_world_update( name ):
       t1.append( ':'.join( i ) )
     file.write( ','.join( t1 ) + '\n' )
 
+  # Cast everything back to an int
+  for t in g_tile_special:
+    for i in range( len( g_tile_special[t] ) ):
+      for j in range( len( g_tile_special[t][i] ) ):
+        g_tile_special[t][i][j] = int( g_tile_special[t][i][j] )
+
 # All room functions should be passed into the goto_room() function as a pointer object
 # The starting room
 def room_menu():
@@ -1502,7 +1512,7 @@ def room_world_create():
 #
 def room_scene( arg = '' ):
 
-  global g_pos, g_view, g_tile_data, g_show_help, g_slot, g_monster, g_hp
+  global g_pos, g_view, g_tile_data, g_show_help, g_slot, g_monster, g_hp, g_hp_max
 
   # Track play time :)
   update_playtime()
@@ -1737,7 +1747,7 @@ def room_scene( arg = '' ):
     # Use
     elif p == 'u':
 
-      USABLES = [ I_SUS_EYE ]
+      USABLES = [ I_SUS_EYE, I_HEALTH_POTION, I_CRYSTAL ]
 
       # Check if nothing is selected
       if g_items[ g_slot ][1] <= 0:
@@ -1753,6 +1763,21 @@ def room_scene( arg = '' ):
         if g_items[ g_slot ][ 0 ] == I_SUS_EYE:
           update_inv( I_SUS_EYE, 1, 'r' )
           # Encounter eye of Cthulhu here
+
+        elif g_items[ g_slot ][ 0 ] == I_HEALTH_POTION:
+          update_inv( I_HEALTH_POTION, 1, 'r' )
+          print( f'[!] You used a healing potion. (+{ min( g_hp + 100, g_hp_max ) - g_hp } HP)' )
+          g_hp = min( g_hp + 100, g_hp_max )
+          goto_room( room_scene )
+
+        elif g_items[ g_slot ][ 0 ] == I_CRYSTAL:
+          if g_hp_max < 400:
+            update_inv( I_CRYSTAL, 1, 'r' )
+            print( '[!] You used a life crystal. (+20 MHP)' )
+            g_hp_max += 20
+            goto_room( room_scene )
+          else:
+            print( '[#] Your health is already maxed.' )
 
     # Break
     elif p == 'b':
@@ -1771,12 +1796,12 @@ def room_scene( arg = '' ):
         else:
           print( 'ERROR: I messed something up' )
 
-      # Check if it's coordiantes
+      # Check if it's coordinates
       elif len( p[2:].split( ' ' ) ) == 2:
 
         try:
           p = [ int( p[2:].split( ' ' )[0] ), int( p[2:].split( ' ' )[1] ), p[0] ]
-        except ValueError:
+        except Exception:
           print( '[#] Enter 2 numbers.' )
 
         else:
@@ -1809,7 +1834,7 @@ def room_scene( arg = '' ):
         # Attempt cast
         try:
           t = V2( int( p[2:].split( ' ' )[0] ), int( p[2:].split( ' ' )[1] ) )
-        except ValueError:
+        except Exception:
           print( '[#] Enter 2 numbers.' )
           t = 'ERROR'
         else:
@@ -1892,7 +1917,7 @@ def room_scene( arg = '' ):
 
       elif p[2:6] == 'set ':
 
-        # Attempt casting coordiantes
+        # Attempt casting coordinates
         try:
           t = g_pos.copy().a( int( p[ 6: ].split( ' ' )[0] ), int( p[ 6: ].split( ' ' )[1] ) )
         except Exception:
@@ -1946,13 +1971,16 @@ def room_scene( arg = '' ):
 # Includes gravity, monster movements, etc.
 def tick( nofall = False ):
 
-  global g_pos
+  global g_pos, g_hp, g_hp_max
 
   # Move player 5 blocks downward
   if not nofall:
     for i in range( 5 ):
       if g_pos.y + 1 < g_world_size.y and get_tile( g_pos.copy().a( 0, 1 ) ) in AIR_BLOCKS:
         g_pos.y += 1
+
+  # Regen health
+  g_hp = min( g_hp + 1, g_hp_max )
 
   data_world_update( g_wname )
 
@@ -2105,12 +2133,12 @@ def chest_remove( x, y ):
 
   global g_tile_special
 
-  g_tile_special.pop( str( x ) + " : " + str( y ) )
+  g_tile_special.pop( f'{ x } : { y }' )
 
 # Break a block
 def break_block( x, y ):
 
-  global g_tile_data
+  global g_tile_data, g_tile_special
 
   # Make sure it's within the world boundaries
   if not ( 0 <= x < g_world_size.x ): return
@@ -2119,6 +2147,11 @@ def break_block( x, y ):
   # Store what the block was, then change it
   t = g_tile_data[ xy2c( x, y, g_world_size.x ) ]
   g_tile_data[ xy2c( x, y, g_world_size.x ) ] = ' '
+
+  # Remove chest data if necessary
+  if t == 'c':
+    chest_remove( x, y )
+
   data_world_update( g_wname ) # Save data
 
   # Return what the block was
@@ -2138,12 +2171,16 @@ def place_block( x, y ):
 
     # Get the block ID of the currently selected item ID
     g_tile_data[ xy2c( x, y, g_world_size.x ) ] = list( ITEM_BLOCKS.keys() )[ list( ITEM_BLOCKS.values() ).index( g_items[ g_slot ][0] ) ]
+
+    # Initialize chest data if necessary
+    if g_tile_data[ xy2c( x, y, g_world_size.x ) ] == 'c':
+      chest_create( x, y )
+
     data_world_update( g_wname ) # Save data
     return True
 
   # Else, return False to indicate failure
   return False
-
 
 # This function exists to reduce code repetition
 def try_break_block( x, y ):
