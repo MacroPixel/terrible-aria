@@ -695,7 +695,7 @@ def data_main_init():
   file = open( 'data.txt', 'w', encoding = 'utf-8' )
   file.write( 'characters: \n' )
   file.write( 'worlds: \n' )
-  file.write( 'blocks: player=Δ;air= ;grass=~;stone=#;log=];leaves=*;iron=&;silver=$;gold=%;wood==;chest=©;crystal=♡' )
+  file.write( 'blocks: player=Δ;air= ;grass=~;stone=#;log=];leaves=*;iron=&;silver=$;gold=%;wood==;platform=-;chest=©;crystal=♡' )
 
 # Loads character list, world list, and settings
 def data_main_load():
@@ -959,12 +959,17 @@ def generate_world( size, seed ):
       o = V2( i1, int( ( size.y / 2 ) + noise_top( i1, seed ) - 1 ) )
 
       if g_tile_data[ xy2c( o.x, o.y + 1, size.x ) ] == 'g': # Make sure there's grass below
+      
+        # Mark root
+        root = o.copy()
 
         # Continue upward for a random height [10, 20]
         for i2 in range( random.randint( 10, 20 ) ):
 
-          # Place down a log and move vector upward
+          # Place down a log and move vector upward (also save special tile data)
           g_tile_data[ xy2c( o.x, o.y, size.x ) ] = 'l'
+          if o.l() != root.l():
+            g_tile_special[ str( o.x ) + " : " + str( o.y ) ] = { 'type': 'stem', 'root': f'{ root.x },{ root.y }' }
           o.y -= 1
 
           # Decide whether the tree should sway a little
@@ -979,6 +984,7 @@ def generate_world( size, seed ):
           for i in range( o.x - 4, o.x + 4 ):
             if random.randint( 0, int( dist( V2( i, j ), o ) ) ) <= 1:
               g_tile_data[ xy2c( i, j, size.x ) ] = 'L'
+              g_tile_special[ str( i ) + " : " + str( j ) ] = { 'type': 'stem', 'root': f'{ root.x },{ root.y }' }
 
       # Choose how far to move before creating another tree
       i1 += int( random.randint( 8, 15 ) * random.choice( ( 0.6, 1, 1, 4 ) ) )
@@ -1098,11 +1104,10 @@ def data_world_init( name, seed ):
     file.write( 'S' + t.replace( ' ', '' ) + ': ' )
     t1 = [] # Empty list to hold temp data
 
-    for i in g_tile_special[t]: # For every list within tile data
-      for j in range( len( i ) ):
-        i[j] = str( i[j] ) # Cast every entry to str
-      t1.append( ':'.join( i ) )
-    file.write( ','.join( t1 ) + '\n' )
+    # ;; separates K:V pairs, and ; separates the K and V
+    for k in g_tile_special[t]:
+      t1.append( f'{ k };{ g_tile_special[t][k] }' )
+    file.write( ';;'.join( t1 ) + '\n' )
 
 # Load a world file with a given name
 def data_world_load( name ):
@@ -1134,9 +1139,9 @@ def data_world_load( name ):
     if not ( len( l ) > 0 and l[0] == 'S' ): continue
 
     t = ' : '.join( l.split( ': ' )[0][1:].split( ':' ) )
-    g_tile_special[ t ] = []
-    for i in l.split( ': ' )[1].split( ',' ):
-      g_tile_special[ t ].append( [ int( i.split( ':' )[0] ), int( i.split( ':' )[1] ) ] )
+    g_tile_special[ t ] = {}
+    for i in l.split( ': ' )[1].split( ';;' ):
+      g_tile_special[ t ][ i.split( ';' )[0] ] = i.split( ';' )[1]
 
   g_show_help = True # Shows a help message on your first turn in the world
   g_slot = 0 # Reset selected slot
@@ -1176,21 +1181,27 @@ def data_world_update( name ):
 
     file.write( 'S' + t.replace( ' ', '' ) + ': ' )
     t1 = [] # Empty list to hold temp data
-    for i in g_tile_special[t]: # For every list within tile data
-      for j in range( len( i ) ):
-        i[j] = str( i[j] ) # Cast every entry to str
-      t1.append( ':'.join( i ) )
-    file.write( ','.join( t1 ) + '\n' )
+    
+    # Read the K:V pair for this tile
+    for k in g_tile_special[t]:
+      t1.append( f'{ k };{ g_tile_special[t][k] }' )
+    file.write( ';;'.join( t1 ) + '\n' )
 
-  # Cast everything back to an int
-  for t in g_tile_special:
-    for i in range( len( g_tile_special[t] ) ):
-      for j in range( len( g_tile_special[t][i] ) ):
-        g_tile_special[t][i][j] = int( g_tile_special[t][i][j] )
+# Saves both character data and world data
+def data_save():
+
+  global g_cname, g_wname
+
+  if g_cname != '':
+    data_char_update( g_cname )
+  if g_wname != '':
+    data_world_update( g_wname )
 
 # All room functions should be passed into the goto_room() function as a pointer object
 # The starting room
 def room_menu():
+  
+  global g_cname, g_wname
 
   # TITLE TEXT :D
   # (generated using https://patorjk.com/software/taag/#p=display&h=0&v=0&f=Soft&t=Terrible-aria)
@@ -1207,6 +1218,10 @@ def room_menu():
 [P] Play
 [Q] Quit''')
 
+  # Reset important stuff
+  g_cname = ''
+  g_wname = ''
+  
   # Keep looping until a valid input is provided
   while True:
     p = input( '> ' ).lower()
@@ -1474,7 +1489,7 @@ def room_world_create():
       # Filter name
       name = list( name )
       for i in range( len( name ) ):
-        if name[i] in [ '/', '\\', '*', '?', '"', '<', '>', '|' ]:
+        if name[i] in [ ':', '/', '\\', '*', '?', '"', '<', '>', '|' ]:
           name[i] = '_'
       name = ''.join( name )
 
@@ -1681,7 +1696,7 @@ def room_scene( arg = '' ):
               if ( 0 <= g_pos.x + ( 1 if p.split( ' ' )[1][0] == 'r' else -1 ) < g_world_size.x ):
                 if get_tile( g_pos.x + ( 1 if p.split( ' ' )[1][0] == 'r' else -1 ), g_pos.y ) in AIR_BLOCKS:
                   g_pos.x += ( 1 if p.split( ' ' )[1][0] == 'r' else -1 )
-            data_world_update( g_wname )
+            data_save()
             tick()
             goto_room( room_scene )
 
@@ -1714,7 +1729,7 @@ def room_scene( arg = '' ):
           for i in range( t ):
             if g_pos.y > 0 and get_tile( g_pos.x, g_pos.y - 1 ) in AIR_BLOCKS:
               g_pos.y -= 1
-          data_world_update( g_wname )
+          data_save()
           tick( nofall = True )
           goto_room( room_scene )
 
@@ -1886,7 +1901,7 @@ def room_scene( arg = '' ):
             print( 'Those coordinates are out of this world!\n(No, really)')
           else:
             g_pos = t
-            data_world_update( g_wname )
+            data_save()
             print( f'[!] Moved player to ({ t.x }, { t.y })' )
             goto_room( room_scene )
 
@@ -1935,7 +1950,7 @@ def room_scene( arg = '' ):
           # Update the block
           else:
             g_tile_data[ xy2c( *t.l(), g_world_size.x ) ] = p_def[ 6: ].split( ' ' )[2]
-            data_world_update( g_wname )
+            data_save()
             print( f"[!] Set block to ID '{ p_def[ 6: ].split( ' ' )[2] }'" )
             goto_room( room_scene )
 
@@ -1982,7 +1997,7 @@ def tick( nofall = False ):
   # Regen health
   g_hp = min( g_hp + 1, g_hp_max )
 
-  data_world_update( g_wname )
+  data_save()
 
 # Modify the inventory
 # Modes = pickup, remove, or set
@@ -2015,7 +2030,7 @@ def update_inv( item_id, amount, mode = 'p', slot = 0 ):
     for i in range( 16 ):
       if g_items[i][0] == item_id and g_items[i][1] > 0:
         g_items[i][1] += amount
-        data_char_update( g_cname )
+        data_save()
         return True
 
     else:
@@ -2025,7 +2040,7 @@ def update_inv( item_id, amount, mode = 'p', slot = 0 ):
         if g_items[i][1] == 0:
           g_items[i][0] = item_id
           g_items[i][1] = amount
-          data_char_update( g_cname )
+          data_save()
           return True
 
     return False
@@ -2040,14 +2055,14 @@ def update_inv( item_id, amount, mode = 'p', slot = 0 ):
         if g_items[i][1] >= amount:
 
           g_items[i][1] -= amount
-          data_char_update( g_cname )
+          data_save()
           return amount
 
         elif g_items[i][1] > 0:
 
           t = g_items[i][1]
           g_items[i][1] = 0
-          data_char_update( g_cname )
+          data_save()
           return t
 
     # Failed to remove
@@ -2075,34 +2090,34 @@ def update_inv( item_id, amount, mode = 'p', slot = 0 ):
     return 0
 
   # Update character file
-  data_char_update( g_cname )
+  data_save()
 
 # Create new (empty) chest
 def chest_create( x, y ):
 
   global g_tile_special
 
-  g_tile_special[ str( x ) + " : " + str( y ) ] = []
+  g_tile_special[ f'{ x } : { y }' ] = {}
   for i in range( 10 ):
-    g_tile_special[ str( x ) + " : " + str( y ) ].append( [ 0, 0 ] )
+    g_tile_special[ f'{ x } : { y }' ][ f'slot{ i }' ] = '0:0'
 
 def chest_modify( x, y, item_id, amount, mode = 'i' ):
 
   global g_tile_special
-
+  
   # Insert
   if mode == 'i':
 
     # The same as the code for update_inv()
     for i in range( 10 ):
-      if g_tile_special[ str( x ) + " : " + str( y ) ][i][0] == item_id and g_tile_special[ str( x ) + " : " + str( y ) ][i][1] > 0:
-        g_tile_special[ str( x ) + " : " + str( y ) ][i][1] += amount
+      if chest_slot( x, y, i ) == item_id and chest_slot( x, y, i, amount = True ) > 0:
+        chest_slot( x, y, i, amount, amount = True, op = '+' )
         return True
 
     for i in range( 10 ):
-      if g_tile_special[ str( x ) + " : " + str( y ) ][i][1] == 0:
-        g_tile_special[ str( x ) + " : " + str( y ) ][i][0] = item_id
-        g_tile_special[ str( x ) + " : " + str( y ) ][i][1] = amount
+      if chest_slot( x, y, i, amount = True ) == 0:
+        chest_slot( x, y, i, item_id, op = '=' )
+        chest_slot( x, y, i, amount, amount = True, op = '=' )
         return True
 
     return False
@@ -2112,19 +2127,18 @@ def chest_modify( x, y, item_id, amount, mode = 'i' ):
 
     # Try to remove
     for i in range( 10 ):
-      if g_tile_special[ str( x ) + " : " + str( y ) ][i][0] == item_id:
-        if g_tile_special[ str( x ) + " : " + str( y ) ][i][1] >= amount:
+      if chest_slot( x, y, i ) == item_id:
+        if chest_slot( x, y, i, amount = True ) >= amount:
 
-          g_tile_special[ str( x ) + " : " + str( y ) ][i][1] -= amount
-          data_char_update( g_cname )
+          chest_slot( x, y, i, amount, amount = True, op = '-' )
+          data_save()
           return amount
 
-        elif g_tile_special[ str( x ) + " : " + str( y ) ][i][1] > 0:
+        elif chest_slot( x, y, i, amount = True ) > 0:
 
-          t = g_tile_special[ str( x ) + " : " + str( y ) ][i][1]
-          g_tile_special[ str( x ) + " : " + str( y ) ][i][1] = 0
-          data_char_update( g_cname )
-          return t
+          chest_slot( x, y, i, 0, amount = True, op = '=' )
+          data_save()
+          return chest_slot( x, y, i, amount = True )
 
     # Failed to remove
     return 0
@@ -2134,6 +2148,23 @@ def chest_remove( x, y ):
   global g_tile_special
 
   g_tile_special.pop( f'{ x } : { y }' )
+
+def chest_slot( x, y, s, a = 0, amount = False, op = '?' ):
+
+  global g_tile_special
+
+  if op == '?':
+    return int( g_tile_special[ f'{ x } : { y }' ][ f'slot{ s }' ].split( ':' )[ 1 if amount else 0 ] )
+
+  t = g_tile_special[ f'{ x } : { y }' ][ f'slot{ s }' ].split( ':' )
+  t = [ int( t[0] ), int( t[1] ) ]
+
+  if op == '=':
+    t[ 1 if amount else 0 ] = a
+  elif op in ( '+', '-' ):
+    t[ 1 if amount else 0 ] += a * ( 1 if op == '+' else -1 )
+
+  g_tile_special[ f'{ x } : { y }' ][ f'slot{ s }' ] = f'{ t[0] }:{ t[1] }'
 
 # Break a block
 def break_block( x, y ):
@@ -2152,7 +2183,7 @@ def break_block( x, y ):
   if t == 'c':
     chest_remove( x, y )
 
-  data_world_update( g_wname ) # Save data
+  data_save() # Save data
 
   # Return what the block was
   return t
@@ -2176,7 +2207,7 @@ def place_block( x, y ):
     if g_tile_data[ xy2c( x, y, g_world_size.x ) ] == 'c':
       chest_create( x, y )
 
-    data_world_update( g_wname ) # Save data
+    data_save() # Save data
     return True
 
   # Else, return False to indicate failure
@@ -2567,11 +2598,11 @@ def room_chest( arg = '' ):
     print( 'ERROR: Chest data not supplied.' )
     goto_room( 0 )
 
-  k = arg.split( ',' )[1] + ' : ' + arg.split( ',' )[2]
-  if k not in g_tile_special:
+  t1 = V2( int( arg.split( ',' )[1] ), int( arg.split( ',' )[2] ) )
+  if f'{ t1.x } : { t1.y }' not in g_tile_special:
     print( 'ERROR: Chest not at block.' )
     goto_room( 0 )
-
+  
   # Args can be set to 1 to avoid re-printing room data
   if not ( len( arg ) > 0 and arg[0] == '1' ):
 
@@ -2581,8 +2612,8 @@ def room_chest( arg = '' ):
     for i in range( 10 ):
       j = i // 2 + ( i % 2 ) * 5
       t = f"({ '1234567890'[j] }) "
-      t += ( item_meta( g_tile_special[k][j][0] ) if g_tile_special[k][j][1] != 0 else '...' )
-      t += f"  x{ g_tile_special[k][j][1] }" if g_tile_special[k][j][1] != 0 else ''
+      t += ( item_meta( chest_slot( *t1.l(), j ) ) if chest_slot( *t1.l(), j, amount = True ) != 0 else '...' )
+      t += f"  x{ chest_slot( *t1.l(), j, amount = True ) }" if chest_slot( *t1.l(), j, amount = True ) != 0 else ''
       t = t[:38]
       print( t + ' ' * ( 40 - len( t ) ), end = ( '' if j < 5 else '\n' ) )
     print()
@@ -2645,7 +2676,7 @@ def room_chest( arg = '' ):
             else:
 
               # Attempt to insert item (reload chest)
-              if chest_modify( int( k.split( ' : ' )[0] ), int( k.split( ' : ' )[1] ), g_items[t][0], min( g_items[t][1], p ) ):
+              if chest_modify( *t1.l(), g_items[t][0], min( g_items[t][1], p ) ):
                 g_items[t][1] -= min( g_items[t][1], p )
                 goto_room( room_chest, '0' + arg[1:] )
 
@@ -2658,7 +2689,7 @@ def room_chest( arg = '' ):
 
       # Make sure chest isn't empty
       for i in range( 10 ):
-        if g_tile_special[k][i][1] != 0:
+        if chest_slot( *t1.l(), i ) != 0:
           break
       else:
         print( '[#] This chest is empty.' )
@@ -2674,7 +2705,7 @@ def room_chest( arg = '' ):
           print( '[#] Enter a number from 0-9.' )
 
         # Make sure it has an item in it
-        elif g_tile_special[k][ list( '1234567890' ).index( p ) ][1] == 0:
+        elif chest_slot( *t1.l(), list( '1234567890' ).index( p ), amount = True ) == 0:
           print( '[#] This slot is empty.' )
 
         else:
@@ -2693,8 +2724,8 @@ def room_chest( arg = '' ):
             else:
 
               # Attempt to take item (reload chest)
-              if update_inv( g_tile_special[k][t][0], min( g_tile_special[k][t][1], p ) ):
-                g_tile_special[k][t][1] -= min( g_tile_special[k][t][1], p )
+              if update_inv( chest_slot( *t1.l(), t ), min( chest_slot( *t1.l(), t ), p ) ):
+                chest_slot( *t1.l(), t, chest_slot( *t1.l(), t, amount = True ) - min( chest_slot( *t1.l(), t, amount = True ), p ), amount = True, op = '=' )
                 goto_room( room_chest, '0' + arg[1:] )
 
               else:
@@ -2794,7 +2825,7 @@ def room_fight():
       print( '[#] Unknown command.' )
 
   # Save player data
-  data_char_update( g_cname )
+  data_save()
 
   goto_room( room_fight )
 
@@ -2837,8 +2868,7 @@ def room_pause( arg = '' ):
     if p == 'q':
 
       # Save data
-      data_char_update( g_cname )
-      data_world_update( g_wname )
+      data_save()
 
       # Return
       print( '[!] Returned to menu.' )
