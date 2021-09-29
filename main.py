@@ -41,6 +41,22 @@ def update_playtime():
   g_play_time += ( time.time() - g_play_time_last )
   g_play_time_last = time.time()
 
+# Prints playtime in DD:HH:MM:SS format
+def format_playtime( tm ):
+
+  t_d = tm // 86400
+  t_h = ( tm % 86400 ) // 3600
+  t_m = ( tm % 3600 ) // 60
+  t_s = ( tm % 60 )
+
+  t_str = ""
+  t_str += f'{ t_d }d ' if tm >= 86400 else ''
+  t_str += f'{ t_h }h ' if tm >= 3600 else ''
+  t_str += f'{ t_m }m ' if tm >= 60 else ''
+  t_str += f'{ t_s }s'
+
+  return t_str
+
 # Flattens a 2D index [x, y] down to a 1D index [c]
 def xy2c( x, y, w ):
 
@@ -138,12 +154,12 @@ class V2:
 class Monster:
 
   # I don't think I need to explain what this list is for
-  TYPES = [ 'slime', 'zombie', 'demon_eye', 'cave_bat', 'skeleton', 'undead_miner' ]
+  TYPES = [ 'slime', 'zombie', 'demon_eye', 'cave_bat', 'skeleton', 'undead_miner', 'harpy', 'tim' ]
 
   # The health each monster starts off with
   HEALTHS = {
     'slime' : 50, 'zombie' : 90, 'demon_eye' : 70, 'cave_bat' : 40,
-    'skeleton' : 150, 'undead_miner' : 120
+    'skeleton' : 150, 'undead_miner' : 120, 'harpy' : 80, 'tim' : 200
   }
 
   # The player's options for each player turn
@@ -155,7 +171,9 @@ class Monster:
     'cave_bat' : [ [ 's', 'Jump and swing sword' ], [ 'f', 'Shoot forward' ], [ 'r', 'Shoot rightward' ] ],
     'skeleton' : [ [ 's', 'Swing sword (*)' ], [ 'j', 'Jump and swing sword' ], [ 'u', 'Shoot upward' ],
       [ 'r', 'Shoot rightward' ], [ 'l', 'Shoot leftward' ] ],
-    'undead_miner' : [ [ 's', 'Swing sword' ], [ 'a', 'Shoot arrow' ] ]
+    'undead_miner' : [ [ 's', 'Swing sword' ], [ 'a', 'Shoot arrow' ] ],
+    'harpy' : [ [ 'g', 'Throw grenade' ], [ 'r', 'Shoot rightward' ], [ 'l', 'Shoot leftward' ] ],
+    'tim' : [ [ 's', 'Swing sword' ], [ 'a', 'Shoot arrow' ], [ 'g', 'Throw grenade' ], [ 'n', 'Do nothing' ] ]
   }
 
   # The monster's options for each player turn
@@ -165,18 +183,20 @@ class Monster:
     'demon_eye' : [ 'fly rightward', 'fly leftward' ],
     'cave_bat' : [ 'hover', 'fly sideways', 'fly upward' ],
     'skeleton' : [ 'shield', 'jump', 'move rightward', 'move leftward' ],
-    'undead_miner' : [ 'deflect', 'jump' ]
+    'undead_miner' : [ 'deflect', 'jump' ],
+    'harpy' : [ 'fly upward', 'fly rightward', 'fly leftward' ],
+    'tim' : [ 'reflect', 'charge attack', 'heal', 'teleport' ]
   }
 
   # The result of each player turn
-  # Format: [ Text + HP Lost + 'p'layer/'e'nemy ]
+  # Format: [ Text + HP Lost + modifier ]
   P_TURN_RESULTS = {
     'slime : s : jump' : [ 'The enemy jumped over your sword.' ],
     'slime : s : sit' : [ 'You attacked the enemy.', ( 12, 24 ) ],
     'slime : f : jump' : [ 'The enemy jumped over your arrow.' ],
-    'slime : f : sit' : [ 'The enemy stayed stationary and was hit by your arrow.', ( 8, 16 ) ],
+    'slime : f : sit' : [ 'The enemy remained stationary and was hit by your arrow.', ( 8, 16 ) ],
     'slime : u : jump' : [ 'The enemy jumped into your arrow.', ( 8, 16 ) ],
-    'slime : u : sit' : [ 'The enemy stayed stationary, so your arrow missed.' ],
+    'slime : u : sit' : [ 'The enemy remained stationary, so your arrow missed.' ],
     'zombie : s : jump' : [ 'The enemy jumped over your sword.' ],
     'zombie : s : move backward' : [ 'The enemy moved backward, but was still hit by your sword.', ( 12, 24 ) ],
     'zombie : f : jump' : [ 'The enemy jumped over your arrow.' ],
@@ -227,18 +247,45 @@ class Monster:
     'undead_miner : s : deflect' : [ 'The enemy stayed still, so you hit it with your sword.', ( 12, 24 ) ],
     'undead_miner : s : jump' : [ 'The enemy jumped over your sword.' ],
     'undead_miner : a : deflect' : [ 'You shot at the enemy, but it blew up your arrow with a grenade.' ],
-    'undead_miner : a : jump' : [ 'The enemy jumped, and you shot your arrow at it.', ( 6, 12 ) ]
+    'undead_miner : a : jump' : [ 'The enemy jumped, and you shot your arrow at it.', ( 6, 12 ) ],
+    'harpy : g : fly upward' : [ 'The enemy flew upward and your grenade hit it.', ( 24, 48 ) ],
+    'harpy : g : fly rightward' : [ 'The enemy flew right of your grenade, which fell back and hit you.', ( 24, 48 ), 'p' ],
+    'harpy : g : fly leftward' : [ 'The enemy flew left of your grenade, which fell back and hit you.', ( 24, 48 ), 'p' ],
+    'harpy : r : fly upward' : [ 'The enemy flew upward, so your arrow missed.' ],
+    'harpy : r : fly rightward' : [ 'The enemy flew rightward into your arrow.', ( 6, 12 ) ],
+    'harpy : r : fly leftward' : [ 'The enemy flew leftward, so your arrow missed.' ],
+    'harpy : l : fly upward' : [ 'The enemy flew upward, so your arrow missed.' ],
+    'harpy : l : fly rightward' : [ 'The enemy flew rightward, so your arrow missed.' ],
+    'harpy : l : fly leftward' : [ 'The enemy flew leftward into your arrow.', ( 6, 12 ) ],
+    'tim : s : reflect' : [ 'You swung your sword, but the enemy reflected your attack towards you.', ( 8, 16 ), 'p' ],
+    'tim : s : charge attack' : [ 'You hit the enemy while it charged its attack.', ( 8, 16 ) ],
+    'tim : s : heal' : [ 'You hit the enemy while it healed itself.', ( 8, 16 ) ],
+    'tim : s : teleport' : [ 'You swung your sword at the enemy, but it teleported away from your attack.' ],
+    'tim : a : reflect' : [ 'You shot an arrow at the enemy, but it reflected your attack towards you.', ( 6, 12 ), 'p' ],
+    'tim : a : charge attack' : [ 'You shot the enemy while it charged its attack.', ( 6, 12 ) ],
+    'tim : a : heal' : [ 'You shot the enemy while it healed itself.', ( 6, 12 ) ],
+    'tim : a : teleport' : [ 'You shot at the enemy, but it teleported away from your attack.' ],
+    'tim : g : reflect' : [ 'You used a grenade, but the enemy reflected your attack towards you.', ( 24, 48 ), 'p' ],
+    'tim : g : charge attack' : [ 'You hit the enemy with a grenade while it charged its attack.', ( 24, 48 ) ],
+    'tim : g : heal' : [ 'You hit the enemy with a grenade while it healed itself.', ( 24, 48 ) ],
+    'tim : g : teleport' : [ 'You threw a grenade at the enemy, but it teleported away from your attack.' ],
+    'tim : n : reflect' : [ 'The enemy attempted to reflect your attack, but you didn\'t attack it.' ],
+    'tim : n : charge attack' : [ 'The enemy charged its next attack.' ],
+    'tim : n : heal' : [ 'The enemy healed itself.' ],
+    'tim : n : teleport' : [ 'The enemy teleported away from you.' ]
   }
 
   # The player's options for each monster turn
   # Format: [ Letter ID, Action Name, Requirements ]
   PLAYER_DODGES = {
-    'slime' : [ [ 'b', 'Move backward' ], [ 'f', 'Move forward' ], [ 's', 'Stay stationary' ] ],
+    'slime' : [ [ 'b', 'Move backward' ], [ 'f', 'Move forward' ], [ 's', 'Remain stationary' ] ],
     'zombie' : [ [ 'b', 'Move backward' ], [ 'f', 'Move forward' ], [ 'j', 'Jump' ] ],
     'demon_eye' : [ [ 'b', 'Move backward' ], [ 'r', 'Move rightward' ], [ 'l', 'Move leftward' ], [ 'j', 'Jump (*)' ] ],
-    'cave_bat' : [ [ 'j', 'Jump' ], [ 's', 'Stay stationary' ] ],
+    'cave_bat' : [ [ 'j', 'Jump' ], [ 's', 'Remain stationary' ] ],
     'skeleton' : [ [ 'j', 'Jump' ], [ 'b', 'Move backward' ] ],
-    'undead_miner' : [ [ 'j', 'Jump' ], [ 'f', 'Step forward' ], [ 's', 'Stay stationary' ] ],
+    'undead_miner' : [ [ 'j', 'Jump' ], [ 'f', 'Step forward' ], [ 's', 'Remain stationary' ] ],
+    'harpy' : [ [ 'j', 'Jump' ], [ 'b', 'Move backward' ], [ 's', 'Move sideways' ] ],
+    'tim' : [ [ 's', 'Remain stationary' ], [ 'j', 'Jump' ], [ 'r', 'Move rightward' ], [ 'l', 'Move leftward' ] ]
   }
 
   # The monster's options for each monster turn
@@ -248,7 +295,9 @@ class Monster:
     'demon_eye' : [ 'from front', 'from side' ],
     'cave_bat' : [ 'missed', 'low attack', 'high attack' ],
     'skeleton' : [ 'charge', 'jump', 'bone', 'bone upward' ],
-    'undead_miner' : [ 'charge', 'grenade' ]
+    'undead_miner' : [ 'charge', 'grenade' ],
+    'harpy' : [ 'from top', 'from front', 'from side' ],
+    'tim' : [ 'normal spell', 'dual spell', 'circular spell', 'teleports behind you' ]
   }
 
   # The result of each monster turn
@@ -308,7 +357,39 @@ class Monster:
     'undead_miner : s : charge' : [ 'The enemy charged towards you, and you didn\'t move out of its way.', ( 14, 28 ) ],
     'undead_miner : s : grenade' : [ 'The enemy arced a grenade at you, and you didn\'t move out of the way.', ( 14, 28 ) ],
     'undead_miner : ! : charge' : [ 'The enemy charged towards you.', ( 14, 28 ) ],
-    'undead_miner : ! : grenade' : [ 'The enemy arced a grenade at you.', ( 14, 28 ) ]
+    'undead_miner : ! : grenade' : [ 'The enemy arced a grenade at you.', ( 14, 28 ) ],
+    'harpy : j : from top' : [ 'A feather was shot downward at you, and you jumped into it.', ( 24, 36 ) ],
+    'harpy : j : from front' : [ 'A feather was shot backward at you, and you jumped over it.' ],
+    'harpy : j : from side' : [ 'A feather was shot rightward at you, and you jumped over it.' ],
+    'harpy : b : from top' : [ 'A feather was shot downward at you, and you moved out of the way.' ],
+    'harpy : b : from front' : [ 'A feather was shot backward at you, and you didn\'t move out of the way.', ( 24, 36 ) ],
+    'harpy : b : from side' : [ 'A feather was shot rightward at you, and you moved out of the way.' ],
+    'harpy : s : from top' : [ 'A feather was shot downward at you, and you moved out of the way.' ],
+    'harpy : s : from front' : [ 'A feather was shot backward at you, and you moved out of the way.' ],
+    'harpy : s : from side' : [ 'A feather was shot rightward at you, and you didn\'t move out of the way.', ( 24, 36 ) ],
+    'harpy : ! : from top' : [ 'A feather was shot downward at you.', ( 24, 36 ) ],
+    'harpy : ! : from front' : [ 'A feather was shot backward at you.', ( 24, 36 ) ],
+    'harpy : ! : from side' : [ 'A feather was shot rightward at you.', ( 24, 36 ) ],
+    'tim : s : normal spell' : [ 'The enemy shot a spell at you, and you didn\'t move out of the way.', ( 30, 45 ) ],
+    'tim : s : dual spell' : [ 'The enemy shot a dual spell to your right and left.' ],
+    'tim : s : circular spell' : [ 'The enemy shot a circular spell around you.' ],
+    'tim : s : teleports behind you' : [ 'The enemy teleported behind you, and you didn\'t move out of its way.', ( 15, 25 ) ],
+    'tim : j : normal spell' : [ 'The enemy shot a spell at you, and you jumped over it.' ],
+    'tim : j : dual spell' : [ 'The enemy shot a dual spell to your right and left.' ],
+    'tim : j : circular spell' : [ 'The enemy shot a circular spell, and you jumped into it.', ( 30, 45 ) ],
+    'tim : j : teleports behind you' : [ 'The enemy teleported behind you, and you fell onto it.', ( 15, 25 ) ],
+    'tim : r : normal spell' : [ 'The enemy shot a spell at you, and you moved to its right.' ],
+    'tim : r : dual spell' : [ 'The enemy shot a dual spell, and you moved rightward into it.', ( 30, 45 ) ],
+    'tim : r : circular spell' : [ 'The enemy shot a circular spell, and you stepped rightward into it.', ( 30, 45 ) ],
+    'tim : r : teleports behind you' : [ 'The enemy teleported behind you, and you moved to its right.' ],
+    'tim : l : normal spell' : [ 'The enemy shot a spell at you, and you moved to its left.' ],
+    'tim : l : dual spell' : [ 'The enemy shot a dual spell, and you moved leftward into it.', ( 30, 45 ) ],
+    'tim : l : circular spell' : [ 'The enemy shot a circular spell, and you stepped leftward into it.', ( 30, 45 ) ],
+    'tim : l : teleports behind you' : [ 'The enemy teleported behind you, and you moved to its right.' ],
+    'tim : ! : normal spell' : [ 'The enemy shot a spell at you.', ( 30, 45 ) ],
+    'tim : ! : dual spell' : [ 'The enemy shot a dual spell to your right and left.' ],
+    'tim : ! : circular spell' : [ 'The enemy shot a circular spell around you.' ],
+    'tim : ! : teleports behind you' : [ 'The enemy teleported behind you.', ( 15, 25 ) ]
   }
 
   def __init__( self, name ):
@@ -320,6 +401,8 @@ class Monster:
     self.move = random.randint( 0, len( self.MONSTER_DODGES[ name ] ) - 1 )
     self.move_0 = self.move
     self.move_c = 0
+
+    self.charged = False # Charged used by Tim
 
     if self.name == 'zombie':
       self.move_c = 1 if self.move == 0 else 0
@@ -377,6 +460,11 @@ class Monster:
     print( '[!] ' + t[0] )
     print( '[*] ' + ( 'Enemy' if t[2] == 'e' else 'You' ) + ': ' + ( '-' + str( self.damage( *t[1], entity = 'self' if t[2] == 'e' else 'you' ) ) + ' HP' if t[1] != 0 else 'NO DAMAGE' ) )
 
+    # Charge/heal (Tim exclusive)
+    if ( self.MONSTER_DODGES[ self.name ][ self.move ] == 'heal' ): print( f'[*] Enemy: +{ -self.damage( -10, -1 ) } HP' )
+    self.charged = ( self.MONSTER_DODGES[ self.name ][ self.move ] == 'charge attack' )
+    if self.charged: print( '[*] Enemy: +50% DMG next turn' )
+
     # Check if fight is over
     self.hp_check()
 
@@ -384,7 +472,6 @@ class Monster:
     self.advance_move()
   
   def monster_turn( self, p ):
-
 
     # Set temporary variables
     t = self.M_TURN_RESULTS[ f'{ self.name } : { p } : { self.MONSTER_ATTACKS[ self.name ][ self.move ] }' ]
@@ -453,6 +540,13 @@ class Monster:
     elif self.name == 'undead_miner':
       self.move_c += 1
       self.move = ( self.move_0 ) if ( self.move_c % 5 == 0 ) else ( 1 - self.move_0 )
+    
+    elif self.name == 'harpy':
+      self.move = random.choice( [ m for m in [ 0, 1, 2 ] if m != self.move ] )
+
+    elif self.name == 'tim':
+      self.move_c += 1
+      self.move = ( self.move + 1 + ( 1 if self.move_c % ( 2 * ( self.move_0 + 1 ) ) == 0 else 0 ) ) % 4
 
 # Switches rooms
 def goto_room( room, arg = '' ):
@@ -552,7 +646,7 @@ ITEM_META = [
 
 # GLOBAL CONSTANTS
 DEBUG = True
-SHOW_PROG = True
+SHOW_PROG = False
 AIR_BLOCKS = [ ' ', 'l', 'L' ]
 ITEM_BLOCKS = { 'g': I_GRASS, 's': I_STONE, 'w': I_WOOD, 'i': I_IRON_ORE, 'S': I_SILVER_ORE, 'G': I_GOLD_ORE }
 
@@ -648,7 +742,7 @@ def data_char_init( name ):
 
   # Open/write to file
   file = open( 'c_' + name + '.txt', 'w' )
-  file.write( '\nversion: 1.0' )
+  file.write( 'version: 1.0\n' )
   file.write( 'hp: 100,100\n' )
   file.write( 'items: 1:1,2:1,' ) # Defaults to sword/pickaxe
   for i in range( 14 ):
@@ -677,14 +771,28 @@ def data_char_load( name ):
   for i in range( 16 ):
     g_items.append( [ int( t[i].split( ':' )[0] ), int( t[i].split( ':' )[1] ) ] )
 
-  update_inv( 0, 0, mode = '!' ) # Properly organizes inventory
-
   # Other stuff
   g_deaths = int( file[3][8:] )
   g_play_time = int( file[4][11:] )
 
+  update_inv( 0, 0, mode = '!' ) # Properly organizes inventory
+
+# Prints the details of a character file
+def data_char_info( name ):
+
+  # Split file into statements
+  file = open( 'c_' + name + '.txt', 'r' ).read().split( '\n' )
+
+  # Print info
+  print( f"Name: { name }" )
+  print( f"HP: { file[1][4:].split( ',' )[0] } / { file[1][4:].split( ',' )[1] }" )
+  print( f"Deaths: { file[3][8:] }" )
+  print( f"Play Time: { format_playtime( int( file[4][11:] ) ) }" )
+
 # Write back to the character file if something changed
 def data_char_update( name ):
+
+  update_playtime()
 
   file = open( 'c_' + name + '.txt', 'w' )
 
@@ -716,7 +824,7 @@ def generate_world( size, seed ):
   CRYSTALS = True
   CRYSTALS_FREQ = 25
   CHESTS = True
-  CHESTS_FREQ = 12
+  CHESTS_FREQ = 8
 
   global g_tile_data, g_pos
 
@@ -873,8 +981,41 @@ def generate_world( size, seed ):
   else:
     progress = print_progress( progress, 1, 5, 'Generating trees' ) # Autofill progress if skipped
 
+  # Chest rooms
+  if CHESTS:
+
+    # List of chest coords
+    t1 = []
+
+    # Each iteration creates a new chest room
+    for l1 in range( CHESTS_FREQ ):
+
+      # Basically a while loop but with a limit so it doesn't go forever if something unexpected happens
+      for l2 in range( 999 ):      
+
+        # Choose a random position underground
+        o = V2( random.randint( 30, size.x - 30 ), random.randint( int( size.y * 0.7 ), size.y - 5 ) )
+
+        # See if it's too close to another chest
+        too_close = False
+        for i in t1:
+          if dist( o, i ) < 40: too_close = True
+
+        # If not, place it and the room
+        if not too_close:
+          
+          t1.append( o )
+          for yy in range( o.y - 8, o.y + 2 ):
+            for xx in range( o.x - 10, o.x + 11 ):
+              g_tile_data[ xy2c( xx, yy, size.x ) ] = ( 'w' if xx in ( o.x - 10, o.x + 10 ) or yy in ( o.y - 8, o.y + 1 ) else ' ' ) # Place outline / air pocket
+          g_tile_data[ xy2c( *o.l(), size.x ) ] = 'c' # Place chest
+          break
+
+    progress = print_progress( progress, CHESTS_FREQ, 5, 'Generating chest rooms' ) # Update progress
+  else:
+    progress = print_progress( progress, 1, 5, 'Generating chest rooms' ) # Autofill progress if skipped
+
   # Generate life crystals
-  c_total = 0
   if CRYSTALS:
     
     # Each iteration creates a new life crystal
@@ -884,7 +1025,7 @@ def generate_world( size, seed ):
       for l2 in range( 999 ):
 
         # Choose a random position underground
-        o = V2( random.randint( 0, size.x ), random.randint( int( size.y * 0.7 ), size.y - 5 ) )
+        o = V2( random.randint( 0, size.x ), random.randint( int( size.y * 0.62 ), size.y - 5 ) )
 
         # Continue downward until stone block is found
         for l3 in range( o.y, size.y - 4 ):
@@ -895,7 +1036,6 @@ def generate_world( size, seed ):
 
             # Create a life crystal and exit the loop
             g_tile_data[ xy2c( *o.l(), size.x ) ] = 'C'
-            c_total += 1
             break
         else:
           continue
@@ -958,6 +1098,17 @@ def data_world_load( name ):
   g_show_help = True # Shows a help message on your first turn in the world
   g_slot = 0 # Reset selected slot
   g_play_time_last = time.time()
+
+# Prints info for a world file
+def data_world_info( name ):
+
+  # Split file into statements
+  file = open( 'w_' + name + '.txt', 'r' ).read().split( '\n' )
+
+  # Print info
+  print( f"Name: { name }" )
+  print( f"Seed: { int( file[2][6:] ) }" )
+  print( f"Size: { int( file[1][6:].split( ',' )[0] ) }x{ int( file[1][6:].split( ',' )[1] ) }" )
 
 # Write back to the world file if something changed
 def data_world_update( name ):
@@ -1022,7 +1173,8 @@ def room_character_select():
   for i in range( len( g_data[ 'char_list' ] ) ):
     print( f'[{ i + 1 }] { g_data[ "char_list" ][i] }' )
   print( '[C] Create new character' )
-  print( '[D] Delete chracter' )
+  print( '[I] Character info' )
+  print( '[D] Delete character' )
   print( '[Q] Back' )
 
   while True:
@@ -1037,11 +1189,13 @@ def room_character_select():
     elif p == 'q':
       goto_room( room_menu )
 
-    # Delete character
-    elif p == 'd':
+    # Delete character/character info
+    elif p == 'd' or p == 'i':
+
+      p_old = p
 
       # Get index
-      print( 'Enter the character slot would like to delete:' )
+      print( f'Enter the character slot would like to { "delete" if p == "d" else "get info for" }:' )
       while True:
         p = input( '> ' )
 
@@ -1061,17 +1215,26 @@ def room_character_select():
             # Store name in a temp variable so I don't have to retype this mess ↓
             t = g_data[ 'char_list' ][ p - 1 ]
 
-            # Make sure they actually want to
-            print( f'Are you sure you want to delete character "{ t }"?' )
-            print( 'Type "yes" to proceed.' )
-            if input( '> ' ).lower() == 'yes':
+            # Delete
+            if p_old == 'd':
 
-              # Delete character file and update character list in data.txt
-              print( '[!] Character deleted.' )
-              if os.path.exists( 'c_' + t + '.txt' ):
-                os.remove( 'c_' + t + '.txt' )
-              g_data[ 'char_list' ].pop( p - 1 )
-              data_main_update()
+              # Make sure they actually want to
+              print( f'Are you sure you want to delete character "{ t }"?' )
+              print( 'Type "yes" to proceed.' )
+              if input( '> ' ).lower() == 'yes':
+
+                # Delete character file and update character list in data.txt
+                print( '[!] Character deleted.' )
+                if os.path.exists( 'c_' + t + '.txt' ):
+                  os.remove( 'c_' + t + '.txt' )
+                g_data[ 'char_list' ].pop( p - 1 )
+                data_main_update()
+
+            # Info
+            else:
+
+              # Show info
+              data_char_info( t )
 
             # Re-show character list
             goto_room( room_character_select )
@@ -1135,6 +1298,7 @@ def room_world_select():
   for i in range( len( g_data[ 'world_list' ] ) ):
     print( f'[{ i + 1 }] { g_data[ "world_list" ][i] }' )
   print( '[C] Create new world' )
+  print( '[I] World info' )
   print( '[D] Delete world' )
   print( '[Q] Back' )
 
@@ -1150,11 +1314,13 @@ def room_world_select():
     elif p == 'q':
       goto_room( room_character_select )
 
-    # Delete world
-    elif p == 'd':
+    # Delete world/world info
+    elif p == 'd' or p == 'i':
+
+      p_old = p
 
       # Get index
-      print( 'Enter the world slot would like to delete:' )
+      print( f'Enter the world slot would like to { "delete" if p == "d" else "get info for" }:' )
       while True:
         p = input( '> ' )
 
@@ -1162,8 +1328,7 @@ def room_world_select():
         try:
           p = int( p )
         except ValueError:
-          print( '[#] Must supply a number.' )
-
+          print( '[#] Enter a number.' )
         else:
 
           print( p )
@@ -1177,17 +1342,26 @@ def room_world_select():
             # Store name in a temp variable so I don't have to retype this mess ↓
             t = g_data[ 'world_list' ][ p - 1 ]
 
-            # Make sure they actually want to
-            print( f'Are you sure you want to delete world "{ t }"?' )
-            print( 'Type "yes" to proceed.' )
-            if input( '> ' ).lower() == 'yes':
+            # Delete
+            if p_old == 'd':
 
-              # Delete world file and update world list in data.txt
-              print( '[!] World deleted.' )
-              if os.path.exists( 'w_' + t + '.txt' ):
-                os.remove( 'w_' + t + '.txt' )
-              g_data[ 'world_list' ].pop( p - 1 )
-              data_main_update()
+              # Make sure they actually want to
+              print( f'Are you sure you want to delete world "{ t }"?' )
+              print( 'Type "yes" to proceed.' )
+              if input( '> ' ).lower() == 'yes':
+
+                # Delete world file and update world list in data.txt
+                print( '[!] World deleted.' )
+                if os.path.exists( 'w_' + t + '.txt' ):
+                  os.remove( 'w_' + t + '.txt' )
+                g_data[ 'world_list' ].pop( p - 1 )
+                data_main_update()
+
+            # Info
+            else:
+
+              # Show info
+              data_world_info( t )
 
             # Re-show world list
             goto_room( room_world_select )
