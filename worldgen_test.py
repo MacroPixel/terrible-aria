@@ -27,6 +27,9 @@ def sym2col( s ):
   if s == 'i': return ( 150, 130, 120 )
   if s == 'S': return ( 170, 170, 190 )
   if s == 'G': return ( 230, 190, 40 )
+  if s == 'w': return ( 120, 70, 10 )
+  if s == 'c': return ( 210, 150, 0 )
+  if s == 'C': return ( 255, 150, 150 )
   if s == 'P': return ( 0, 0, 255 )
   return( 255, 255, 255 )
 
@@ -35,45 +38,115 @@ class V2:
   def __init__( self, x = 0, y = 0 ):
     self.u( x, y )
 
-  def op( self, a, b, op ):
+  # These two functions help to reduce repetitive code within the operation functions
+  def __op( self, a, b, op ):
 
     if op == '+': return a + b
     if op == '-': return a - b
     if op == '*': return a * b
     if op == '/': return a / b
 
-  def op2( self, a, b, op ):
+  def __op2( self, a, b, op ):
 
-    self.x = self.op( self.x, a, op )
-    self.y = self.op( self.y, a if b == 'd' else b, op )
+    if isinstance( a, V2 ):
+      self.x = self.__op( self.x, a.x, op )
+      self.y = self.__op( self.y, a.y, op )
+    else:
+      self.x = self.__op( self.x, a, op )
+      self.y = self.__op( self.y, a if b == 'd' else b, op )
 
+  # Update
   def u( self, a = 0, b = 0 ):
     self.x = a
     self.y = b
     return self
 
+  # Add
   def a( self, a, b = 'd' ):
-    self.op2( a, b, '+' )
+    self.__op2( a, b, '+' )
     return self
 
+  # Subtract
   def s( self, a, b = 'd' ):
-    self.op2( a, b, '-' )
+    self.__op2( a, b, '-' )
     return self
 
+  # Multiply
   def m( self, a, b = 'd' ):
-    self.op2( a, b, '*' )
+    self.__op2( a, b, '*' )
     return self
 
+  # Divide
   def d( self, a, b = 'd' ):
-    self.op2( a, b, '/' )
+    self.__op2( a, b, '/' )
     return self
 
+  # Return a list
   def l( self ):
     return [ self.x, self.y ]
 
+  # Return a copy
   def copy( self ):
     c = V2( self.x, self.y )
     return c
+
+# Create new (empty) chest
+def chest_create( x, y ):
+
+  global g_tile_special
+
+  g_tile_special[ str( x ) + " : " + str( y ) ] = []
+  for i in range( 10 ):
+    g_tile_special[ str( x ) + " : " + str( y ) ].append( [ 0, 0 ] )
+
+def chest_modify( x, y, item_id, amount, mode = 'i' ):
+
+  global g_tile_special
+
+  # Insert
+  if mode == 'i':
+
+    # The same as the code for update_inv()
+    for i in range( 10 ):
+      if g_tile_special[ str( x ) + " : " + str( y ) ][i][0] == item_id and g_tile_special[ str( x ) + " : " + str( y ) ][i][1] > 0:
+        g_tile_special[ str( x ) + " : " + str( y ) ][i][1] += amount
+        return True
+
+    for i in range( 10 ):
+      if g_tile_special[ str( x ) + " : " + str( y ) ][i][1] == 0:
+        g_tile_special[ str( x ) + " : " + str( y ) ][i][0] = item_id
+        g_tile_special[ str( x ) + " : " + str( y ) ][i][1] = amount
+        return True
+
+    return False
+
+  # Remove
+  elif mode == 'r':
+
+    # Try to remove
+    for i in range( 10 ):
+      if g_tile_special[ str( x ) + " : " + str( y ) ][i][0] == item_id:
+        if g_tile_special[ str( x ) + " : " + str( y ) ][i][1] >= amount:
+
+          g_tile_special[ str( x ) + " : " + str( y ) ][i][1] -= amount
+          data_char_update( g_cname )
+          return amount
+
+        elif g_tile_special[ str( x ) + " : " + str( y ) ][i][1] > 0:
+
+          t = g_tile_special[ str( x ) + " : " + str( y ) ][i][1]
+          g_tile_special[ str( x ) + " : " + str( y ) ][i][1] = 0
+          data_char_update( g_cname )
+          return t
+
+    # Failed to remove
+    return 0
+
+def chest_remove( x, y ):
+
+  global g_tile_special
+
+  g_tile_special.pop( f'{ x } : { y }' )
 
 def print_progress( prog, div_this, div_total, s ):
 
@@ -95,9 +168,40 @@ def noise_top( x, seed ):
   random.seed( next_seed )
   return s / 4;
 
+# ITEM CONSTANTS
+I_NULL = 0
+I_C_SSWORD = 1
+I_C_PICK = 2
+I_GRASS = 3
+I_STONE = 4
+I_WOOD = 5
+I_IRON_ORE = 6
+I_SILVER_ORE = 7
+I_GOLD_ORE = 8
+I_IRON_BAR = 9
+I_SILVER_BAR = 10
+I_GOLD_BAR = 11
+I_W_SWORD = 12
+I_I_SWORD = 13
+I_S_SWORD = 14
+I_G_SWORD = 15
+I_W_BOW = 16
+I_I_BOW = 17
+I_S_BOW = 18
+I_G_BOW = 19
+I_TORCH = 20
+I_ARROW = 21
+I_F_ARROW = 22
+I_PLATFORM = 23
+I_CHEST = 24
+I_SUS_EYE = 25
+I_GRENADE = 26
+I_HEALTH_POTION = 27
+
 world_size = V2( 400, 200 )
 screen_size = world_size.copy().m( 3 )
 g_tile_data = ''
+g_tile_special = {}
 
 def generate_world( size, seed ):
 
@@ -109,8 +213,12 @@ def generate_world( size, seed ):
   TREES = True
   ORES = True
   ORES_FREQ = 128
+  CRYSTALS = True
+  CRYSTALS_FREQ = 25
+  CHESTS = True
+  CHESTS_FREQ = 8
 
-  global g_tile_data, g_pos
+  global g_tile_data, g_tile_special, g_pos
 
   # Clean slate
   g_tile_data = ''
@@ -168,9 +276,9 @@ def generate_world( size, seed ):
           continue
         g_tile_data[ xy2c( clamp( int( o.x ), 1, size.x - 2 ), clamp( int( o.y ), 1, size.y - 2 ), size.x ) ] = c
 
-      progress = print_progress( progress, ORES_FREQ, 40, 'Generating ore veins' ) # Update progress
+      progress = print_progress( progress, ORES_FREQ, 35, 'Generating ore veins' ) # Update progress
   else:
-    progress = print_progress( progress, 1, 40, 'Generating ore veins' ) # Autofill progress if skipped
+    progress = print_progress( progress, 1, 35, 'Generating ore veins' ) # Autofill progress if skipped
 
   # Generate large caves
   if CAVES:
@@ -198,10 +306,10 @@ def generate_world( size, seed ):
             if dist( o, V2( i, j ) ) < s:
               g_tile_data[ xy2c( i, j, size.x ) ] = ' '
 
-      progress = print_progress( progress, CAVES_FREQ, 20, 'Generating caves' ) # Update progress
+      progress = print_progress( progress, CAVES_FREQ, 15, 'Generating caves' ) # Update progress
 
   else:
-    progress = print_progress( progress, 1, 20, 'Generating caves' ) # Autofill progress if skipped
+    progress = print_progress( progress, 1, 15, 'Generating caves' ) # Autofill progress if skipped
 
   # Generate small air pockets
   if POCKETS:
@@ -264,6 +372,84 @@ def generate_world( size, seed ):
     progress = print_progress( progress, 1, 5, 'Generating trees' ) # Update progress
   else:
     progress = print_progress( progress, 1, 5, 'Generating trees' ) # Autofill progress if skipped
+
+  # Chest rooms
+  if CHESTS:
+
+    # List of chest coords
+    t1 = []
+
+    # Each iteration creates a new chest room
+    for l1 in range( CHESTS_FREQ ):
+
+      # Basically a while loop but with a limit so it doesn't go forever if something unexpected happens
+      for l2 in range( 999 ):      
+
+        # Choose a random position underground
+        o = V2( random.randint( 30, size.x - 30 ), random.randint( int( size.y * 0.7 ), size.y - 5 ) )
+
+        # See if it's too close to another chest
+        too_close = False
+        for i in t1:
+          if dist( o, i ) < 40: too_close = True
+
+        # If not, place it and the room
+        if not too_close:
+          
+          t1.append( o )
+          for yy in range( o.y - 8, o.y + 2 ):
+            for xx in range( o.x - 10, o.x + 11 ):
+              g_tile_data[ xy2c( xx, yy, size.x ) ] = ( 'w' if xx in ( o.x - 10, o.x + 10 ) or yy in ( o.y - 8, o.y + 1 ) else ' ' ) # Place outline / air pocket
+          g_tile_data[ xy2c( *o.l(), size.x ) ] = 'c' # Place chest
+
+          # CHEST INFO
+          chest_create( *o.l() )
+
+          t = random.choice( ( ( I_SUS_EYE, 1, 1 ), ( I_HEALTH_POTION, 1, 1 ), ( I_GRENADE, 4, 7 ) ) )
+          chest_modify( *o.l(), t[0], random.randint( t[1], t[2] ), mode = 'i' ) # Random item for slot 1
+
+          t = random.choice( ( ( I_IRON_BAR, 3, 5 ), ( I_SILVER_BAR, 3, 5 ), ( I_GOLD_BAR, 3, 5 ) ) )
+          chest_modify( *o.l(), t[0], random.randint( t[1], t[2] ), mode = 'i' ) # Random bar for slot 1
+
+          t = random.choice( ( ( I_TORCH, 10, 15 ), ( I_ARROW, 15, 25 ), ( I_F_ARROW, 8, 15 ) ) )
+          chest_modify( *o.l(), t[0], random.randint( t[1], t[2] ), mode = 'i' ) # Random bar for slot 1
+
+          break
+
+      progress = print_progress( progress, CHESTS_FREQ, 5, 'Generating chest rooms' ) # Update progress
+  else:
+    progress = print_progress( progress, 1, 5, 'Generating chest rooms' ) # Autofill progress if skipped
+
+  # Generate life crystals
+  if CRYSTALS:
+    
+    # Each iteration creates a new life crystal
+    for l1 in range( CRYSTALS_FREQ ):
+
+      # Basically a while loop but with a limit so it doesn't go forever if something unexpected happens
+      for l2 in range( 999 ):
+
+        # Choose a random position underground
+        o = V2( random.randint( 0, size.x ), random.randint( int( size.y * 0.62 ), size.y - 5 ) )
+
+        # Continue downward until stone block is found
+        for l3 in range( o.y, size.y - 4 ):
+
+          # Check if a life crystal can go here
+          o.y += 1
+          if g_tile_data[ xy2c( *o.l(), size.x ) ] == ' ' and g_tile_data[ xy2c( *o.copy().a( 0, 1 ).l(), size.x ) ] == 's':
+
+            # Create a life crystal and exit the loop
+            g_tile_data[ xy2c( *o.l(), size.x ) ] = 'C'
+            break
+        else:
+          continue
+
+        break
+
+      progress = print_progress( progress, CRYSTALS_FREQ, 5, 'Generating life crystals' ) # Update progress
+  else:
+    progress = print_progress( progress, 1, 5, 'Generating life crystals' ) # Autofill progress if skipped
 
   # Lastly, position the player
   g_pos = V2( size.x // 2, int( ( size.y / 2 ) + noise_top( size.x // 2, seed ) ) - 1 )
