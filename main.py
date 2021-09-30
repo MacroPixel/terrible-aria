@@ -224,7 +224,7 @@ class Monster:
     'cave_bat : r : fly sideways' : [ 'The enemy flew rightward into your arrow.', ( 8, 16 ) ],
     'cave_bat : r : fly upward' : [ 'The enemy flew further away, and your arrow flew to its right.' ],
     'skeleton : s : shield' : [ 'You swung your sword at the enemy, but it absorbed your attack.' ],
-    'skeleton : s : jump' : [ 'chance', ( ( 0, 49, 'hit' ), ( 50, 99 ), 'miss' ) ],
+    'skeleton : s : jump' : [ 'chance', ( ( 0, 49, 'hit' ), ( 50, 99, 'miss' ) ) ],
     'skeleton : s : jump : hit' : [ 'The enemy was about to jump, but you hit it with your sword.', ( 12, 24 ) ],
     'skeleton : s : jump : miss' : [ 'You swung your sword at the enemy, but it jumped over it.' ],
     'skeleton : s : move rightward' : [ 'You swung your sword at the enemy, but it moved rightward.' ],
@@ -431,35 +431,35 @@ class Monster:
 
   def get_options( self, player_turn, should_print = True ):
 
-    t = []
+    options_list = []
     for s in ( self.PLAYER_ATTACKS[ self.name ] if player_turn else self.PLAYER_DODGES[ self.name ] ):
       if should_print:
         print( f'[{ s[0].upper() }] { s[1] }' )
-      t.append( s[0].lower() )
+      options_list.append( s[0].lower() )
 
-    return t
+    return options_list
   
   def player_turn( self, p ):
 
     # Set temporary variables
-    t = self.P_TURN_RESULTS[ f'{ self.name } : { p } : { self.MONSTER_DODGES[ self.name ][ self.move ] }' ]
+    result = self.P_TURN_RESULTS[ f'{ self.name } : { p } : { self.MONSTER_DODGES[ self.name ][ self.move ] }' ]
 
     # Evaluate chance
-    if t[0] == 'chance':
+    if result[0] == 'chance':
       temp_rand = random.randint( 0, 99 )
-      for i in t[1]:
+      for i in result[1]:
         if ( i[0] <= temp_rand <= i[1] ):
-          t = self.P_TURN_RESULTS[ f'{ self.name } : { p } : { self.MONSTER_DODGES[ self.name ][ self.move ] } : { i[2] }' ]
+          result = self.P_TURN_RESULTS[ f'{ self.name } : { p } : { self.MONSTER_DODGES[ self.name ][ self.move ] } : { i[2] }' ]
           break
       else:
         print( "ERROR: Random values don't add up to 100." )
 
-    if len( t ) == 1: t.append( 0 )
-    if len( t ) == 2: t.append( 'e' )
+    if len( result ) == 1: result.append( 0 )
+    if len( result ) == 2: result.append( 'e' )
 
     # Display text/subtract HP
-    print( '[!] ' + t[0] )
-    print( '[*] ' + ( 'Enemy' if t[2] == 'e' else 'You' ) + ': ' + ( '-' + str( self.damage( *t[1], entity = 'self' if t[2] == 'e' else 'you' ) ) + ' HP' if t[1] != 0 else 'NO DAMAGE' ) )
+    print( '[!] ' + result[0] )
+    print( '[*] ' + ( 'Enemy' if result[2] == 'e' else 'You' ) + ': ' + ( '-' + str( self.damage( *result[1], entity = 'self' if result[2] == 'e' else 'you' ) ) + ' HP' if result[1] != 0 else 'NO DAMAGE' ) )
 
     # Charge/heal (Tim exclusive)
     if ( self.MONSTER_DODGES[ self.name ][ self.move ] == 'heal' ): print( f'[*] Enemy: +{ -self.damage( -10, -1 ) } HP' )
@@ -475,23 +475,23 @@ class Monster:
   def monster_turn( self, p ):
 
     # Set temporary variables
-    t = self.M_TURN_RESULTS[ f'{ self.name } : { p } : { self.MONSTER_ATTACKS[ self.name ][ self.move ] }' ]
+    result = self.M_TURN_RESULTS[ f'{ self.name } : { p } : { self.MONSTER_ATTACKS[ self.name ][ self.move ] }' ]
 
     # Evaluate chance
-    if t[0] == 'chance':
+    if result[0] == 'chance':
       temp_rand = random.randint( 0, 99 )
-      for i in t[1]:
+      for i in result[1]:
         if ( i[0] <= temp_rand <= i[1] ):
-          t = self.M_TURN_RESULTS[ f'{ self.name } : { p } : { self.MONSTER_ATTACKS[ self.name ][ self.move ] } : { i[2] }' ]
+          result = self.M_TURN_RESULTS[ f'{ self.name } : { p } : { self.MONSTER_ATTACKS[ self.name ][ self.move ] } : { i[2] }' ]
           break
       else:
         print( "ERROR: Random values don't add up to 100." )
 
-    if len( t ) == 1: t.append( 0 )
-    if len( t ) == 2: t.append( 'p' )
+    if len( result ) == 1: result.append( 0 )
+    if len( result ) == 2: result.append( 'p' )
 
-    print( '[!] ' + t[0] )
-    print( '[*] ' + ( 'Enemy' if t[2] == 'e' else 'You' ) + ': ' + ( '-' + str( self.damage( *t[1], entity = 'self' if t[2] == 'e' else 'you' ) ) + ' HP' if t[1] != 0 else 'NO DAMAGE' ) )
+    print( '[!] ' + result[0] )
+    print( '[*] ' + ( 'Enemy' if result[2] == 'e' else 'You' ) + ': ' + ( '-' + str( self.damage( *result[1], entity = 'self' if result[2] == 'e' else 'you' ) ) + ' HP' if result[1] != 0 else 'NO DAMAGE' ) )
 
     # Check if fight is over
     self.hp_check()
@@ -561,7 +561,6 @@ def print_line():
 # I don't think it's important to explain what the arguments do
 def print_progress( prog, div_this, div_total, s ):
 
-  t = int( prog )
   prog += ( 1 / div_this ) * ( div_total / 2 ) # Add to progress
   suffix = f'{ int( prog * 2 ) }% ' if prog < 50 else 'Done!' # Create a suffix that contains the progress/current task
   if prog < 50:
@@ -575,14 +574,384 @@ def print_progress( prog, div_this, div_total, s ):
 # so I may or may not make a supplemental video dedicated to explaining it)
 def noise_top( x, seed ):
 
-
   next_seed = random.randint( 1, 10 ** 12 )
   random.seed( seed )
-  s = 0
+  sine = 0
   for i in range( 12 ):
-    s += random.randrange( 3, 12 ) * sin( x / random.randrange( 6, 24 ) - random.randrange( 10, 80 ) )
+    sine += random.randrange( 3, 12 ) * sin( x / random.randrange( 6, 24 ) - random.randrange( 10, 80 ) )
   random.seed( next_seed )
-  return s / 4;
+  return sine / 4;
+
+# Allow time to move forward a little bit
+# Includes gravity, monster movements, etc.
+def tick( nofall = False ):
+
+  global g_pos, g_hp, g_hp_max, g_enemy_timer
+
+  # Move player 5 blocks downward
+  if not nofall:
+    for i in range( 5 ):
+
+      # Move
+      if g_pos.y + 1 < g_world_size.y and get_tile( g_pos.copy().a( 0, 1 ) ) in AIR_BLOCKS:
+        g_pos.y += 1
+
+  # Start fight
+  g_enemy_timer -= 1
+  if g_enemy_timer <= 0:
+    g_enemy_timer = random.randint( 20, 35 )
+    try_fight()
+
+  # Regen health
+  g_hp = min( g_hp + 1, g_hp_max )
+
+  data_save()
+
+# Modify the inventory
+# Modes = pickup, remove, or set
+def update_inv( item_id, amount, mode = 'p', slot = 0 ):
+
+  global g_items
+
+  inv_keys = [] # Holds the 'keys' of the inventory
+
+  # Before doing anything else, make sure everything is properly stacked
+  for i in range( 16 ):
+
+    # Reset ID of anything with count 0
+    if g_items[i][1] == 0:
+      g_items[i][0] = 0
+    inv_keys.append( g_items[i][0] )
+
+  for i in range( len( inv_keys ) ):
+
+    # If this is a duplicate, and it isn't the first slot with this item,
+    # then add count to first slot with this item
+    if inv_keys[i] != 0 and inv_keys.count( inv_keys[i] ) != 1 and inv_keys.index( inv_keys[i] ) != i:
+      g_items[ inv_keys.index( inv_keys[i] ) ][1] += g_items[i][1]
+      g_items[i] = [ 0, 0 ]
+
+  # Pickup mode
+  if mode == 'p':
+
+    # First try to stack (MAKE SURE SLOT ISN'T EMPTY)
+    for i in range( 16 ):
+      if g_items[i][0] == item_id and g_items[i][1] > 0:
+        g_items[i][1] += amount
+        data_save()
+        return True
+
+    else:
+
+      # Then find empty slot
+      for i in range( 16 ):
+        if g_items[i][1] == 0:
+          g_items[i][0] = item_id
+          g_items[i][1] = amount
+          data_save()
+          return True
+
+    return False
+
+  # Removal mode
+  # (Returns the # of items that were able to be removed)
+  elif mode == 'r':
+
+    # Try to remove
+    for i in range( 16 ):
+      if g_items[i][0] == item_id:
+        if g_items[i][1] >= amount:
+
+          g_items[i][1] -= amount
+          data_save()
+          return amount
+
+        elif g_items[i][1] > 0:
+
+          old_value = g_items[i][1]
+          g_items[i][1] = 0
+          data_save()
+          return old_value
+
+    # Failed to remove
+    return 0
+
+  # Set mode
+  # Sets the specified slot to the provided item and amount
+  elif mode == 's':
+
+    # Check range
+    if ( 0 <= slot < 16 ):
+
+      # Modify
+      g_items[ slot ][0] = item_id
+      g_items[ slot ][1] = amount
+
+  # Test mode
+  # Tests how much of an item is present in the inventory
+  elif mode == 't':
+
+    for i in range( 16 ):
+      if g_items[i][0] == item_id:
+        return g_items[i][1]
+
+    return 0
+
+  # Update character file
+  data_save()
+
+# Create new (empty) chest
+def chest_create( x, y ):
+
+  global g_tile_special
+
+  g_tile_special[ f'{ x } : { y }' ] = {}
+  for i in range( 10 ):
+    g_tile_special[ f'{ x } : { y }' ][ f'slot{ i }' ] = '0:0'
+
+def chest_modify( x, y, item_id, amount, mode = 'i' ):
+
+  global g_tile_special
+  
+  # Insert
+  if mode == 'i':
+
+    # The same as the code for update_inv()
+    for i in range( 10 ):
+      if chest_slot( x, y, i ) == item_id and chest_slot( x, y, i, amount = True ) > 0:
+        chest_slot( x, y, i, amount, amount = True, op = '+' )
+        return True
+
+    for i in range( 10 ):
+      if chest_slot( x, y, i, amount = True ) == 0:
+        chest_slot( x, y, i, item_id, op = '=' )
+        chest_slot( x, y, i, amount, amount = True, op = '=' )
+        return True
+
+    return False
+
+  # Remove
+  elif mode == 'r':
+
+    # Try to remove
+    for i in range( 10 ):
+      if chest_slot( x, y, i ) == item_id:
+        if chest_slot( x, y, i, amount = True ) >= amount:
+
+          chest_slot( x, y, i, amount, amount = True, op = '-' )
+          data_save()
+          return amount
+
+        elif chest_slot( x, y, i, amount = True ) > 0:
+
+          chest_slot( x, y, i, 0, amount = True, op = '=' )
+          data_save()
+          return chest_slot( x, y, i, amount = True )
+
+    # Failed to remove
+    return 0
+
+def chest_remove( x, y ):
+
+  global g_tile_special
+
+  g_tile_special.pop( f'{ x } : { y }' )
+
+def chest_slot( x, y, s, a = 0, amount = False, op = '?' ):
+
+  global g_tile_special
+
+  if op == '?':
+    return int( g_tile_special[ f'{ x } : { y }' ][ f'slot{ s }' ].split( ':' )[ 1 if amount else 0 ] )
+
+  values = g_tile_special[ f'{ x } : { y }' ][ f'slot{ s }' ].split( ':' )
+  values = [ int( values[0] ), int( values[1] ) ]
+
+  if op == '=':
+    values[ 1 if amount else 0 ] = a
+  elif op in ( '+', '-' ):
+    values[ 1 if amount else 0 ] += a * ( 1 if op == '+' else -1 )
+
+  g_tile_special[ f'{ x } : { y }' ][ f'slot{ s }' ] = f'{ values[0] }:{ values[1] }'
+
+# Break a block
+def break_block( x, y, ignore_tree = False ):
+
+  global g_tile_data, g_tile_special
+
+  # Make sure it's within the world boundaries
+  if not ( 0 <= x < g_world_size.x ): return
+  if not ( 0 <= y < g_world_size.y ): return
+
+  # Store what the block was, then change it
+  old_value = g_tile_data[ xy2c( x, y, g_world_size.x ) ]
+  g_tile_data[ xy2c( x, y, g_world_size.x ) ] = ' '
+
+  # If the block is part of a tree
+  if not ignore_tree and old_value in ( 'l', 'L' ) and 'type' in g_tile_special[ f'{ x } : { y }' ]:
+
+    # Copy the tile positions from the root
+    tile_positions = []
+    if g_tile_special[ f'{ x } : { y }' ][ 'type' ] == 'root':
+      root_pos = V2( x, y )
+      for i in g_tile_special[ f'{ x } : { y }' ][ 'links' ].split( ',,' ):
+        tile_positions.append( V2( int( i.split( ',' )[0] ), int( i.split( ',' )[1] ) ) )
+    else:
+      root_pos = g_tile_special[ f'{ x } : { y }' ][ 'root' ]
+      root_pos = V2( int( root_pos.split( ',' )[0] ), int( root_pos.split( ',' )[1] ) )
+      for i in g_tile_special[ f"{ root_pos.x } : { root_pos.y }" ][ 'links' ].split( ',,' ):
+        tile_positions.append( V2( int( i.split( ',' )[0] ), int( i.split( ',' )[1] ) ) )
+
+    # Remove branches that are above the one broken
+    # And all the leaves
+    for pos in tile_positions.copy():
+      if ( pos.y <= y or get_tile( *pos.l() ) == 'L' ) and ( pos.x != x or pos.y != y ):
+        old_value = break_block( *pos.l(), ignore_tree = True )
+        if old_value in ITEM_BLOCKS:
+          update_inv( ITEM_BLOCKS[ old_value ], 1 )
+        tile_positions.remove( pos )
+      elif ( pos.x == x and pos.y == y ):
+        tile_positions.remove( pos )
+
+    # Remove unwanted positions from stem data
+    if get_tile( *root_pos.l() ) == 'l':
+      tile_strings = []
+      for pos in tile_positions:
+        tile_strings.append( f'{ pos.x },{ pos.y }' )
+      g_tile_special[ f'{ root_pos.x } : { root_pos.y }' ][ 'links' ] = ',,'.join( tile_strings )
+
+  # Remove special data if necessary
+  if f'{ x } : { y }' in g_tile_special:
+    g_tile_special.pop( f'{ x } : { y }' )
+
+  data_save() # Save data
+
+  # Return what the block was
+  return old_value
+
+# Place a block
+def place_block( x, y ):
+
+  global g_tile_data
+
+  # Make sure it's within the world boundaries
+  if not ( 0 <= x < g_world_size.x ): return
+  if not ( 0 <= y < g_world_size.y ): return
+
+  # If the block is air, replace it
+  if g_tile_data[ xy2c( x, y, g_world_size.x ) ] == ' ':
+
+    # Get the block ID of the currently selected item ID
+    g_tile_data[ xy2c( x, y, g_world_size.x ) ] = list( ITEM_BLOCKS.keys() )[ list( ITEM_BLOCKS.values() ).index( g_items[ g_slot ][0] ) ]
+
+    # Initialize chest data if necessary
+    if g_tile_data[ xy2c( x, y, g_world_size.x ) ] == 'c':
+      chest_create( x, y )
+
+    data_save() # Save data
+    return True
+
+  # Else, return False to indicate failure
+  return False
+
+# This function exists to reduce code repetition
+def try_break_block( x, y ):
+
+  # Check whether the player is holding a pickaxe
+
+  # Not holding anything
+  if g_items[ g_slot ][1] <= 0:
+    print( f'[!] You are not holding an item!' )
+    goto_room( room_scene, '1' )
+
+  # Not holding pickaxe
+  elif g_items[ g_slot ][0] != 2:
+    print( f'[!] Item "{ item_meta( g_slot, c = 1 ) }" cannot break blocks!' )
+    goto_room( room_scene, '1' )
+
+  # Holding pickaxe
+  else:
+
+    # Break block
+    # break_block() performs bounds checking, so there's no need to check whether our break position is within the world
+    old_value = break_block( g_pos.x + x, g_pos.y + y )
+
+    # break_block() returns the ID of the block that was broken, which is stored in t
+    # If possible, this block is put in the player's inventory
+    if old_value in ITEM_BLOCKS:
+      update_inv( ITEM_BLOCKS[ old_value ], 1 )
+
+    # Performing a game tick prevents the player from floating above it like a cartoon character
+    tick()
+    goto_room( room_scene ) # We can now reload the room
+
+# This function also exists to reduce code repetition
+# (even though it's pretty much just an inverse of the above function)
+def try_place_block( x, y ):
+
+  # Check whether the player is holding a block
+
+  # Not holding anything
+  if g_items[ g_slot ][1] <= 0:
+    print( f'[!] You are not holding an item!' )
+    goto_room( room_scene, '1' )
+
+  # Not holding a block
+  elif g_items[ g_slot ][0] not in ITEM_BLOCKS.values():
+    print( f'[!] Item "{ item_meta( g_slot, c = 1 ) }" is not placeable!' )
+    goto_room( room_scene, '1' )
+
+  # Holding a block
+  else:
+
+    # Place block
+    # place_block() performs bounds checking, so there's no need to check whether our break position is within the world
+    success = place_block( g_pos.x + x, g_pos.y + y )
+
+    # place_block() returns whether the attempt was successful, which is stored in t
+    # If successful, one block is removed from the player's inventory
+    if success:
+      update_inv( g_items[ g_slot ][0], 1, 'r' )
+
+    # Performing a game tick prevents the player from floating above it like a cartoon character
+    tick()
+    goto_room( room_scene ) # We can now reload the room
+
+def try_fight():
+
+  temp_rand = random.randint( 1, 100 ) # Used for deciding which enemy is encountered
+
+  # Top 40% - Harpies only
+  if ( g_pos.y < g_world_size.y * 0.4 ):
+    start_fight( 'harpy' )
+
+  # 40%-60% - 50% slime, 30% zombie, 20% demon_eye
+  elif ( g_world_size.y * 0.4 < g_pos.y < g_world_size.y * 0.6 ):
+    if ( temp_rand < 50 ): start_fight( 'slime' )
+    elif ( temp_rand < 80 ): start_fight( 'zombie' )
+    else: start_fight( 'demon_eye' )
+
+  # 60%-80% - 40% cave bat, 60% skeleton
+  elif ( g_world_size.y * 0.6 < g_pos.y < g_world_size.y * 0.8 ):
+    if ( temp_rand < 40 ): start_fight( 'cave_bat' )
+    else: start_fight( 'skeleton' )
+
+  # Bottom 20% - 30% cave bat, 50% skeleton, 15% undead miner, 5% tim
+  elif ( g_world_size.y * 0.6 < g_pos.y < g_world_size.y * 0.8 ):
+    if ( temp_rand < 30 ): start_fight( 'cave_bat' )
+    elif ( temp_rand < 80 ): start_fight( 'skeleton' )
+    elif ( temp_rand < 95 ): start_fight( 'undead_miner' )
+    else: start_fight( 'tim' )
+
+def start_fight( monster_id ):
+  
+  global g_monster
+  g_monster = Monster( monster_id )
+  
+  print_line()
+  input( f"You encountered a { g_monster.name.replace( '_', ' ' ).title() }! " )
+  
+  goto_room( room_fight )
 
 # ITEM CONSTANTS
 I_NULL = 0
@@ -649,7 +1018,7 @@ ITEM_META = [
 
 # GLOBAL CONSTANTS
 DEBUG = True
-SHOW_PROG = False
+SHOW_PROG = True
 AIR_BLOCKS = [ ' ', 'l', 'L', 'c', 'C' ]
 ITEM_BLOCKS = { 'g': I_GRASS, 's': I_STONE, 'w': I_WOOD, 'l': I_WOOD, 'i': I_IRON_ORE, 'S': I_SILVER_ORE, 'G': I_GOLD_ORE,
   'p': I_PLATFORM, 'c': I_CHEST, 'C': I_CRYSTAL }
@@ -663,10 +1032,12 @@ g_view = V2( 0, 0 )
 g_world_size = V2( 0, 0 )
 g_tile_data = []
 g_tile_special = {}
+g_enemy_timer = 0
 g_seed = 0
 g_hp = 0
 g_hp_max = 0
 g_items = []
+g_items_extra = []
 g_slot = 0
 g_deaths = 0
 g_versions = [ '', '' ]
@@ -685,7 +1056,8 @@ g_tmap = {
   'gold': '%',
   'wood': '=',
   'chest': '©',
-  'crystal': '♥'
+  'crystal': '♥',
+  'enemy': '!'
 }
 g_monster = 0
 
@@ -695,7 +1067,7 @@ def data_main_init():
   file = open( 'data.txt', 'w', encoding = 'utf-8' )
   file.write( 'characters: \n' )
   file.write( 'worlds: \n' )
-  file.write( 'blocks: player=Δ;air= ;grass=~;stone=#;log=];leaves=*;iron=&;silver=$;gold=%;wood==;platform=-;chest=©;crystal=♡' )
+  file.write( 'blocks: player=Δ;air= ;grass=~;stone=#;log=];leaves=*;iron=&;silver=$;gold=%;wood==;platform=-;chest=©;crystal=♥,enemy=!' )
 
 # Loads character list, world list, and settings
 def data_main_load():
@@ -718,10 +1090,10 @@ def data_main_load():
     g_data[ 'world_list' ] = []
 
   # Define the tile map
-  t = file[2][ 8: ].replace( '==', '=__EQUAL__').split( ';' )
-  for s in t:
-    if len( s.split( '=' ) ) == 2 and len( s.split( '=' )[1] ) > 0:
-      g_tmap[ s.split( '=' )[0] ] = ( s.split( '=' )[1] if s.split( '=' )[1] != '__EQUAL__' else '=' )
+  raw_tile_map = file[2][ 8: ].replace( '==', '=__EQUAL__').split( ';' )
+  for pair in raw_tile_map:
+    if len( pair.split( '=' ) ) == 2 and len( pair.split( '=' )[1] ) > 0:
+      g_tmap[ pair.split( '=' )[0] ] = ( pair.split( '=' )[1] if pair.split( '=' )[1] != '__EQUAL__' else '=' )
 
 # Write back to the data file if something changed
 def data_main_update():
@@ -737,10 +1109,10 @@ def data_main_update():
     file.write( ( ',' if c != g_data[ 'world_list' ][0] else '' ) + c )
 
   # Tile map
-  t = ''
+  tile_map_string = ''
   for b in g_tmap:
-    t += ';' + b + '=' + g_tmap[b]
-  file.write( '\nblocks: ' + t[1:] )
+    tile_map_string += ';' + b + '=' + g_tmap[b]
+  file.write( '\nblocks: ' + tile_map_string[1:] )
 
 # Initialize a character file upon creation
 def data_char_init( name ):
@@ -752,13 +1124,14 @@ def data_char_init( name ):
   file.write( 'items: 1:1,2:1,' ) # Defaults to sword/pickaxe
   for i in range( 14 ):
     file.write( '0:0' + ( ',' if i != 15 else '' ) )
-  file.write( '\ndeaths: 0' )
-  file.write( '\nplay_time: 0' )
+  file.write( '\nextra_items: \n' )
+  file.write( 'deaths: 0\n' )
+  file.write( 'play_time: 0' )
 
 # Load a character file with a given name
 def data_char_load( name ):
 
-  global g_hp, g_hp_max, g_items, g_deaths, g_versions, g_play_time
+  global g_hp, g_hp_max, g_items, g_items_extra, g_deaths, g_versions, g_play_time
 
   # Split file into statements
   file = open( 'c_' + name + '.txt', 'r' ).read().split( '\n' )
@@ -772,13 +1145,20 @@ def data_char_load( name ):
 
   # Setup item array
   g_items = []
-  t = file[2][7:].split( ',' )
+  item_string = file[2][7:].split( ',' )
   for i in range( 16 ):
-    g_items.append( [ int( t[i].split( ':' )[0] ), int( t[i].split( ':' )[1] ) ] )
+    g_items.append( [ int( item_string[i].split( ':' )[0] ), int( item_string[i].split( ':' )[1] ) ] )
+
+  # Setup extra item array
+  g_items_extra = []
+  item_string = file[3][13:].split( ',' )
+  if len( file[3][13:] ) > 0:
+    for i in item_string:
+      g_items_extra.append( [ int( i.split( ':' )[0] ), int( i.split( ':' )[1] ) ] )
 
   # Other stuff
-  g_deaths = int( file[3][8:] )
-  g_play_time = int( file[4][11:] )
+  g_deaths = int( file[4][8:] )
+  g_play_time = int( file[5][11:] )
 
   update_inv( 0, 0, mode = '!' ) # Properly organizes inventory
 
@@ -812,9 +1192,14 @@ def data_char_update( name ):
   for i in range( 16 ):
     file.write( f'{ g_items[i][0] }:{ g_items[i][1] }' + ( ',' if i != 15 else '' ) )
 
+  # Write extra item array
+  file.write( '\nextra_items: ' )
+  for i in range( len( g_items_extra ) ):
+    file.write( f'{ g_items_extra[i][0] }:{ g_items_extra[i][1] }' + ( ',' if i != len( g_items_extra ) - 1 else '' ) )
+
   # Other stuff
-  file.write( f'\ndeaths: { g_deaths }' ) 
-  file.write( f'\nplay_time: { int( g_play_time ) }' )
+  file.write( f'\ndeaths: { g_deaths }\n' ) 
+  file.write( f'play_time: { int( g_play_time ) }' )
 
 def generate_world( size, seed ):
 
@@ -849,14 +1234,14 @@ def generate_world( size, seed ):
 
   # Fill in area under the noise curve
   for i in range( size.x ):
-    t = int( ( size.y / 2 ) + noise_top( i, seed ) )
+    noise_height = int( ( size.y / 2 ) + noise_top( i, seed ) )
 
     # 4 blocks of grass
-    for j in range( t, t + 4 ):
+    for j in range( noise_height, noise_height + 4 ):
       g_tile_data[ xy2c( i, j, size.x ) ] = 'g'
 
     # And everything under it is stone
-    for j in range( t + 4, size.y ):
+    for j in range( noise_height + 4, size.y ):
       g_tile_data[ xy2c( i, j, size.x ) ] = 's'
 
     progress = print_progress( progress, size.x, 15, 'Generating initial terrain' ) # Update progress
@@ -962,6 +1347,7 @@ def generate_world( size, seed ):
       
         # Mark root
         root = o.copy()
+        root_links = []
 
         # Continue upward for a random height [10, 20]
         for i2 in range( random.randint( 10, 20 ) ):
@@ -969,7 +1355,8 @@ def generate_world( size, seed ):
           # Place down a log and move vector upward (also save special tile data)
           g_tile_data[ xy2c( o.x, o.y, size.x ) ] = 'l'
           if o.l() != root.l():
-            g_tile_special[ str( o.x ) + " : " + str( o.y ) ] = { 'type': 'stem', 'root': f'{ root.x },{ root.y }' }
+            g_tile_special[ str( o.x ) + " : " + str( o.y ) ] = { 'type': 'tile', 'root': f'{ root.x },{ root.y }' }
+            root_links.append( f'{ o.x },{ o.y }' )
           o.y -= 1
 
           # Decide whether the tree should sway a little
@@ -985,6 +1372,10 @@ def generate_world( size, seed ):
             if random.randint( 0, int( dist( V2( i, j ), o ) ) ) <= 1:
               g_tile_data[ xy2c( i, j, size.x ) ] = 'L'
               g_tile_special[ str( i ) + " : " + str( j ) ] = { 'type': 'stem', 'root': f'{ root.x },{ root.y }' }
+              root_links.append( f'{ i },{ j }' )
+
+        # Create root data now that the tree's tile positions have been recorded 
+        g_tile_special[ str( root.x ) + " : " + str( root.y ) ] = { 'type': 'root', 'links': ',,'.join( root_links ) }
 
       # Choose how far to move before creating another tree
       i1 += int( random.randint( 8, 15 ) * random.choice( ( 0.6, 1, 1, 4 ) ) )
@@ -996,8 +1387,8 @@ def generate_world( size, seed ):
   # Chest rooms
   if CHESTS:
 
-    # List of chest coords
-    t1 = []
+    # List of the position of every chest
+    chest_positions = []
 
     # Each iteration creates a new chest room
     for l1 in range( CHESTS_FREQ ):
@@ -1010,13 +1401,13 @@ def generate_world( size, seed ):
 
         # See if it's too close to another chest
         too_close = False
-        for i in t1:
+        for i in chest_positions:
           if dist( o, i ) < 40: too_close = True
 
         # If not, place it and the room
         if not too_close:
           
-          t1.append( o )
+          chest_positions.append( o )
           for yy in range( o.y - 8, o.y + 2 ):
             for xx in range( o.x - 10, o.x + 11 ):
               g_tile_data[ xy2c( xx, yy, size.x ) ] = ( 'w' if xx in ( o.x - 10, o.x + 10 ) or yy in ( o.y - 8, o.y + 1 ) else ' ' ) # Place outline / air pocket
@@ -1025,14 +1416,14 @@ def generate_world( size, seed ):
           # CHEST INFO
           chest_create( *o.l() )
 
-          t = random.choice( ( ( I_SUS_EYE, 1, 1 ), ( I_HEALTH_POTION, 1, 1 ), ( I_GRENADE, 4, 7 ) ) )
-          chest_modify( *o.l(), t[0], random.randint( t[1], t[2] ), mode = 'i' ) # Random item for slot 1
+          chosen_item = random.choice( ( ( I_SUS_EYE, 1, 1 ), ( I_HEALTH_POTION, 1, 1 ), ( I_GRENADE, 4, 7 ) ) )
+          chest_modify( *o.l(), chosen_item[0], random.randint( chosen_item[1], chosen_item[2] ), mode = 'i' ) # Random item for slot 1
 
-          t = random.choice( ( ( I_IRON_BAR, 3, 5 ), ( I_SILVER_BAR, 3, 5 ), ( I_GOLD_BAR, 3, 5 ) ) )
-          chest_modify( *o.l(), t[0], random.randint( t[1], t[2] ), mode = 'i' ) # Random bar for slot 1
+          chosen_item = random.choice( ( ( I_IRON_BAR, 3, 5 ), ( I_SILVER_BAR, 3, 5 ), ( I_GOLD_BAR, 3, 5 ) ) )
+          chest_modify( *o.l(), chosen_item[0], random.randint( chosen_item[1], chosen_item[2] ), mode = 'i' ) # Random bar for slot 1
 
-          t = random.choice( ( ( I_TORCH, 10, 15 ), ( I_ARROW, 15, 25 ), ( I_F_ARROW, 8, 15 ) ) )
-          chest_modify( *o.l(), t[0], random.randint( t[1], t[2] ), mode = 'i' ) # Random bar for slot 1
+          chosen_item = random.choice( ( ( I_TORCH, 10, 15 ), ( I_ARROW, 15, 25 ), ( I_F_ARROW, 8, 15 ) ) )
+          chest_modify( *o.l(), chosen_item[0], random.randint( chosen_item[1], chosen_item[2] ), mode = 'i' ) # Random bar for slot 1
 
           break
 
@@ -1102,17 +1493,17 @@ def data_world_init( name, seed ):
   for t in g_tile_special:
 
     file.write( 'S' + t.replace( ' ', '' ) + ': ' )
-    t1 = [] # Empty list to hold temp data
+    special_data_keys = [] # Empty list to hold temp data
 
     # ;; separates K:V pairs, and ; separates the K and V
     for k in g_tile_special[t]:
-      t1.append( f'{ k };{ g_tile_special[t][k] }' )
-    file.write( ';;'.join( t1 ) + '\n' )
+      special_data_keys.append( f'{ k };{ g_tile_special[t][k] }' )
+    file.write( ';;'.join( special_data_keys ) + '\n' )
 
 # Load a world file with a given name
 def data_world_load( name ):
 
-  global g_pos, g_world_size, g_seed, g_tile_data, g_tile_special, g_show_help, g_slot, g_versions, g_play_time_last
+  global g_pos, g_world_size, g_seed, g_tile_data, g_tile_special, g_show_help, g_slot, g_versions, g_play_time_last, g_enemy_timer
 
   # Split file into statements
   file = open( 'w_' + name + '.txt', 'r' ).read().split( '\n' )
@@ -1133,19 +1524,22 @@ def data_world_load( name ):
 
   # Read special tile data
   g_tile_special = {}
-  for l in file[ 4 + g_world_size.y:len( file ) ]:
+  for line in file[ 4 + g_world_size.y:len( file ) ]:
 
     # Exit if not data
-    if not ( len( l ) > 0 and l[0] == 'S' ): continue
+    if not ( len( line ) > 0 and line[0] == 'S' ): continue
 
-    t = ' : '.join( l.split( ': ' )[0][1:].split( ':' ) )
-    g_tile_special[ t ] = {}
-    for i in l.split( ': ' )[1].split( ';;' ):
-      g_tile_special[ t ][ i.split( ';' )[0] ] = i.split( ';' )[1]
+    temp_key = ' : '.join( line.split( ': ' )[0][1:].split( ':' ) )
+    g_tile_special[ temp_key ] = {}
+    for i in line.split( ': ' )[1].split( ';;' ):
+      g_tile_special[ temp_key ][ i.split( ';' )[0] ] = i.split( ';' )[1]
 
   g_show_help = True # Shows a help message on your first turn in the world
   g_slot = 0 # Reset selected slot
   g_play_time_last = time.time()
+
+  # Reset enemy timer
+  g_enemy_timer = random.randint( 20, 35 )
 
 # Prints info for a world file
 def data_world_info( name ):
@@ -1180,12 +1574,12 @@ def data_world_update( name ):
   for t in g_tile_special:
 
     file.write( 'S' + t.replace( ' ', '' ) + ': ' )
-    t1 = [] # Empty list to hold temp data
+    special_data_keys = [] # Empty list to hold temp data
     
     # Read the K:V pair for this tile
     for k in g_tile_special[t]:
-      t1.append( f'{ k };{ g_tile_special[t][k] }' )
-    file.write( ';;'.join( t1 ) + '\n' )
+      special_data_keys.append( f'{ k };{ g_tile_special[t][k] }' )
+    file.write( ';;'.join( special_data_keys ) + '\n' )
 
 # Saves both character data and world data
 def data_save():
@@ -1228,7 +1622,7 @@ def room_menu():
 
     # Play
     if p == 'p':
-      goto_room( room_character_select )
+      goto_room( room_char_select )
 
     # Quit
     elif p == 'q':
@@ -1240,7 +1634,7 @@ def room_menu():
       print( '[#] Unknown command.' )
 
 # Character selection room
-def room_character_select():
+def room_char_select():
 
   global g_cname, g_data
 
@@ -1260,7 +1654,7 @@ def room_character_select():
 
     # Create character
     if p == 'c':
-      goto_room( room_character_create )
+      goto_room( room_char_create )
 
     # Back
     elif p == 'q':
@@ -1268,6 +1662,11 @@ def room_character_select():
 
     # Delete character/character info
     elif p == 'd' or p == 'i':
+
+      # Exit if no worlds exist (to prevent softlock :))
+      if len( g_data[ 'char_list' ] ) == 0:
+        print( '[#] The character list is empty.' )
+        goto_room( room_char_select )
 
       p_old = p
 
@@ -1289,21 +1688,21 @@ def room_character_select():
 
           else:
 
-            # Store name in a temp variable so I don't have to retype this mess ↓
-            t = g_data[ 'char_list' ][ p - 1 ]
+            # Store name in a temp variable
+            temp_name = g_data[ 'char_list' ][ p - 1 ]
 
             # Delete
             if p_old == 'd':
 
               # Make sure they actually want to
-              print( f'Are you sure you want to delete character "{ t }"?' )
+              print( f'Are you sure you want to delete character "{ temp_name }"?' )
               print( 'Type "yes" to proceed.' )
               if input( '> ' ).lower() == 'yes':
 
                 # Delete character file and update character list in data.txt
                 print( '[!] Character deleted.' )
-                if os.path.exists( 'c_' + t + '.txt' ):
-                  os.remove( 'c_' + t + '.txt' )
+                if os.path.exists( 'c_' + temp_name + '.txt' ):
+                  os.remove( 'c_' + temp_name + '.txt' )
                 g_data[ 'char_list' ].pop( p - 1 )
                 data_main_update()
 
@@ -1311,10 +1710,10 @@ def room_character_select():
             else:
 
               # Show info
-              data_char_info( t )
+              data_char_info( temp_name )
 
             # Re-show character list
-            goto_room( room_character_select )
+            goto_room( room_char_select )
 
     # Either number or invalid input
     else:
@@ -1339,7 +1738,7 @@ def room_character_select():
           goto_room( room_world_select )
 
 # Character creation room
-def room_character_create():
+def room_char_create():
 
   global g_data
 
@@ -1362,7 +1761,7 @@ def room_character_create():
       g_data[ 'char_list' ].append( name )
       data_main_update()
       data_char_init( name )
-      goto_room( room_character_select )
+      goto_room( room_char_select )
 
 # World selection room
 def room_world_select():
@@ -1389,10 +1788,15 @@ def room_world_select():
 
     # Back
     elif p == 'q':
-      goto_room( room_character_select )
+      goto_room( room_char_select )
 
     # Delete world/world info
     elif p == 'd' or p == 'i':
+
+      # Exit if no worlds exist (to prevent softlock :))
+      if len( g_data[ 'world_list' ] ) == 0:
+        print( '[#] The world list is empty.' )
+        goto_room( room_world_select )
 
       p_old = p
 
@@ -1417,20 +1821,20 @@ def room_world_select():
           else:
 
             # Store name in a temp variable so I don't have to retype this mess ↓
-            t = g_data[ 'world_list' ][ p - 1 ]
+            temp_name = g_data[ 'world_list' ][ p - 1 ]
 
             # Delete
             if p_old == 'd':
 
               # Make sure they actually want to
-              print( f'Are you sure you want to delete world "{ t }"?' )
+              print( f'Are you sure you want to delete world "{ temp_name }"?' )
               print( 'Type "yes" to proceed.' )
               if input( '> ' ).lower() == 'yes':
 
                 # Delete world file and update world list in data.txt
                 print( '[!] World deleted.' )
-                if os.path.exists( 'w_' + t + '.txt' ):
-                  os.remove( 'w_' + t + '.txt' )
+                if os.path.exists( 'w_' + temp_name + '.txt' ):
+                  os.remove( 'w_' + temp_name + '.txt' )
                 g_data[ 'world_list' ].pop( p - 1 )
                 data_main_update()
 
@@ -1550,13 +1954,13 @@ def room_scene( arg = '' ):
     # Display world
     # (The code to do this is surprisingly short, eh?)
     for j in range( g_view.y, g_view.y + 41 ):
-      t = ''
+      char_buffer = ''
       for i in range( g_view.x, g_view.x + 61 ):
         if i == g_pos.x and j == g_pos.y:
-          t += g_tmap[ 'player' ] + ' '
+          char_buffer += g_tmap[ 'player' ] + ' '
         else:
-          t += char2tile( g_tile_data[ xy2c( i, j, g_world_size.x ) ] ) + ' '
-      print( t )
+          char_buffer += char2tile( g_tile_data[ xy2c( i, j, g_world_size.x ) ] ) + ' '
+      print( char_buffer )
 
     # Show help options if loaded in for first time
     if g_show_help:
@@ -1576,11 +1980,11 @@ def room_scene( arg = '' ):
       print( '[J] Jump' )
       print( '[W] Wait' )
       print( '[I] Inventory' )
-      print( '[S] Select Item' )
+      print( '[S] Select item' )
       print( '[U] Use current item' )
       print( '[B] Break' )
       print( '[P] Break' )
-      print( '[C] Use Chest' )
+      print( '[C] Use chest' )
       if DEBUG: print( '[$] Debug' )
       print( '[*] Pause' )
 
@@ -1674,28 +2078,35 @@ def room_scene( arg = '' ):
 
       else:
 
-          # Attempt cast
-        try:
-          if len( p.split( ' ' ) ) >= 3:
-            int( p.split( ' ' )[2] )
-        except Exception:
-          print( '[#] Enter a number.' )
-
+        # Get step count
+        if len( p.split( ' ' ) ) >= 3:
+          try:
+            step_count = int( p.split( ' ' )[2] )
+          except ValueError:
+            print( '[#] Enter a number.' )
+            step_count = 'ERROR'
         else:
+          step_count = 1
 
-          # Get step count (defaulting to 1)
-          t = 1 if len( p.split( ' ' ) ) <= 2 else int( p.split( ' ' )[2] )
+        if step_count != 'ERROR':
 
           # Check range
-          if not ( 0 < t <= 5 ):
+          if not ( 0 < step_count <= 5 ):
             print( '[#] Step count out of range.' )
 
           # Move in given direction, run game tick, save data, and reload stage
           else:
-            for i in range( t ):
+            for i in range( step_count ):
               if ( 0 <= g_pos.x + ( 1 if p.split( ' ' )[1][0] == 'r' else -1 ) < g_world_size.x ):
+
+                # Move in direction if air
                 if get_tile( g_pos.x + ( 1 if p.split( ' ' )[1][0] == 'r' else -1 ), g_pos.y ) in AIR_BLOCKS:
                   g_pos.x += ( 1 if p.split( ' ' )[1][0] == 'r' else -1 )
+
+                # Else, try to step up one block
+                elif g_pos.y > 0 and get_tile( g_pos.x + ( 1 if p.split( ' ' )[1][0] == 'r' else -1 ), g_pos.y - 1 ) in AIR_BLOCKS:
+                  g_pos.a( ( 1 if p.split( ' ' )[1][0] == 'r' else -1 ), -1 )
+
             data_save()
             tick()
             goto_room( room_scene )
@@ -1703,20 +2114,20 @@ def room_scene( arg = '' ):
     # Jump command
     elif p == 'j' or p[:2] == 'j ':
 
-      # Get step number
+      # Get jump height
       if len( p ) > 1:
         try:
-          t = int( p[2:] )
+          jump_height = int( p[2:] )
         except ValueError:
           print( '[#] Enter a number.' )
-          t = 'ERROR'
+          jump_height = 'ERROR'
       else:
-        t = 5
+        jump_height = 5
 
-      if t != 'ERROR':
+      if jump_height != 'ERROR':
 
         # Check range
-        if not ( 0 < t <= 5 ):
+        if not ( 0 < jump_height <= 5 ):
           print( '[#] Jump height out of range.' )
 
         # If not on block and not on floor, run game tick and reload stage
@@ -1726,15 +2137,19 @@ def room_scene( arg = '' ):
 
         # Jump, run game tick, save data, and reload stage
         else:
-          for i in range( t ):
+          for i in range( jump_height ):
+
+            # Move up if possible
             if g_pos.y > 0 and get_tile( g_pos.x, g_pos.y - 1 ) in AIR_BLOCKS:
               g_pos.y -= 1
+
           data_save()
           tick( nofall = True )
           goto_room( room_scene )
 
     # Wait
     elif p == 'w':
+
       tick()
       goto_room( room_scene )
 
@@ -1823,13 +2238,13 @@ def room_scene( arg = '' ):
 
           # Check range
           # Temporary variables used for easier formatting
-          t1 = ( -4 <= p[0] <= 4 )
-          t2 = ( -4 <= p[1] <= 4 )
-          if not ( t1 and t2 ):
-            print( f"[#] { '' if t1 else 'X' }{ '' if t1 or t2 else ' and ' }{ '' if t2 else 'Y' } coordinate{ '' if t1 or t2 else 's' } out of range. (Valid range: [-4, 4].)" )
+          x_in_bounds = ( -4 <= p[0] <= 4 )
+          y_in_bounds = ( -4 <= p[1] <= 4 )
+          if not ( x_in_bounds and y_in_bounds ):
+            print( f"[#] { '' if x_in_bounds else 'X' }{ '' if x_in_bounds or y_in_bounds else ' and ' }{ '' if y_in_bounds else 'Y' } coordinate{ '' if x_in_bounds or y_in_bounds else 's' } out of range. (Valid range: [-4, 4])" )
 
           # If both coordinates are valid, then continue onward
-          if t1 and t2:
+          if x_in_bounds and y_in_bounds:
 
             # Attempt to either break or place the block
             if p[2] == 'b':
@@ -1848,32 +2263,32 @@ def room_scene( arg = '' ):
 
         # Attempt cast
         try:
-          t = V2( int( p[2:].split( ' ' )[0] ), int( p[2:].split( ' ' )[1] ) )
+          chest_coords = V2( int( p[2:].split( ' ' )[0] ), int( p[2:].split( ' ' )[1] ) )
         except Exception:
           print( '[#] Enter 2 numbers.' )
-          t = 'ERROR'
+          chest_coords = 'ERROR'
         else:
 
           # Check range
-          t1 = ( -4 <= t.x <= 4 )
-          t2 = ( -4 <= t.y <= 4 )
-          if not ( t1 and t2 ):
-            print( f"[#] { '' if t1 else 'X' }{ '' if t1 or t2 else ' and ' }{ '' if t2 else 'Y' } coordinate{ '' if t1 or t2 else 's' } out of range. (Valid range: [-4, 4].)" )
-            t = 'ERROR'
+          x_in_bounds = ( -4 <= chest_coords.x <= 4 )
+          y_in_bounds = ( -4 <= chest_coords.y <= 4 )
+          if not ( x_in_bounds and y_in_bounds ):
+            print( f"[#] { '' if x_in_bounds else 'X' }{ '' if x_in_bounds or y_in_bounds else ' and ' }{ '' if y_in_bounds else 'Y' } coordinate{ '' if x_in_bounds or y_in_bounds else 's' } out of range. (Valid range: [-4, 4])" )
+            chest_coords = 'ERROR'
 
       # Else default to (0, 0)
       else:
-        t = V2( 0, 0 )
+        chest_coords = V2( 0, 0 )
 
       # If coordinates are correct, try to open chest
-      if t != 'ERROR':
+      if chest_coords != 'ERROR':
 
-        if get_tile( g_pos.copy().a( t ) ) != 'c':
+        if get_tile( g_pos.copy().a( chest_coords ) ) != 'c':
           print( '[#] There is not a chest at the block specified.' )
 
         # Success
         else:
-          goto_room( room_chest, f'0,{ g_pos.copy().a( t ).x },{ g_pos.copy().a( t ).y }' )
+          goto_room( room_chest, f'0,{ g_pos.copy().a( chest_coords ).x },{ g_pos.copy().a( chest_coords ).y }' )
 
     # Debug command (requires debug mode)
     elif p == '$' and DEBUG:
@@ -1889,20 +2304,20 @@ def room_scene( arg = '' ):
 
         # Attempt casting coordinates
         try:
-          t = V2( int( p[ ( 7 if p[2] == 'j' else 8 ): ].split( ' ' )[0] ), int( p[ ( 7 if p[2] == 'j' else 8 ): ].split( ' ' )[1] ) )
+          dest_coords = V2( int( p[ ( 7 if p[2] == 'j' else 8 ): ].split( ' ' )[0] ), int( p[ ( 7 if p[2] == 'j' else 8 ): ].split( ' ' )[1] ) )
           if p[2] == 's':
-            t.a( g_pos )
+            dest_coords.a( g_pos )
         except Exception:
           print( "[#] Invalid coordinates." )
         else:
 
           # Make sure coordinates are within world border
-          if t.x < 0 or t.y < 0 or t.x >= g_world_size.x or t.y > g_world_size.y:
+          if dest_coords.x < 0 or dest_coords.y < 0 or dest_coords.x >= g_world_size.x or dest_coords.y > g_world_size.y:
             print( 'Those coordinates are out of this world!\n(No, really)')
           else:
-            g_pos = t
+            g_pos = dest_coords
             data_save()
-            print( f'[!] Moved player to ({ t.x }, { t.y })' )
+            print( f'[!] Moved player to ({ dest_coords.x }, { dest_coords.y })' )
             goto_room( room_scene )
 
       # Give/remove item
@@ -1913,17 +2328,17 @@ def room_scene( arg = '' ):
 
         # Attempt casting info
         try:
-          t = ( int( p[7:].split( ' ' )[0] ), int( p[7:].split( ' ' )[1] ) )
+          item_info = ( int( p[7:].split( ' ' )[0] ), int( p[7:].split( ' ' )[1] ) )
         except Exception:
           print( '[#] Enter 2 numbers.' )
         else:
 
           # Give/remove and print info
           if p[2] == 'g':
-            update_inv( *t )
-            print( f'[!] Gave you "{ item_meta( t[0] ) }" x{ t[1] }' )
+            update_inv( *item_info )
+            print( f'[!] Gave you "{ item_meta( item_info[0] ) }" x{ item_info[1] }' )
           else:
-            print( f"[!] Removed \"{ item_meta( t[0] ) }\" x{ update_inv( *t, mode = 'r' ) }" )
+            print( f"[!] Removed \"{ item_meta( item_info[0] ) }\" x{ update_inv( *item_info, mode = 'r' ) }" )
           goto_room( room_scene )
 
       # Set block
@@ -1934,13 +2349,13 @@ def room_scene( arg = '' ):
 
         # Attempt casting coordinates
         try:
-          t = g_pos.copy().a( int( p[ 6: ].split( ' ' )[0] ), int( p[ 6: ].split( ' ' )[1] ) )
+          block_coords = g_pos.copy().a( int( p[ 6: ].split( ' ' )[0] ), int( p[ 6: ].split( ' ' )[1] ) )
         except Exception:
           print( "[#] Invalid coordinates." )
         else:
 
           # Make sure coordinates are within world border
-          if t.x < 0 or t.y < 0 or t.x >= g_world_size.x or t.y > g_world_size.y:
+          if block_coords.x < 0 or block_coords.y < 0 or block_coords.x >= g_world_size.x or block_coords.y > g_world_size.y:
             print( 'Those coordinates are out of this world!\n(No, really)')
 
           # Make sure they gave a block ID
@@ -1949,7 +2364,7 @@ def room_scene( arg = '' ):
 
           # Update the block
           else:
-            g_tile_data[ xy2c( *t.l(), g_world_size.x ) ] = p_def[ 6: ].split( ' ' )[2]
+            g_tile_data[ xy2c( *block_coords.l(), g_world_size.x ) ] = p_def[ 6: ].split( ' ' )[2]
             data_save()
             print( f"[!] Set block to ID '{ p_def[ 6: ].split( ' ' )[2] }'" )
             goto_room( room_scene )
@@ -1982,302 +2397,10 @@ def room_scene( arg = '' ):
     else:
       print( '[#] Unknown command.' )
 
-# Allow time to move forward a little bit
-# Includes gravity, monster movements, etc.
-def tick( nofall = False ):
-
-  global g_pos, g_hp, g_hp_max
-
-  # Move player 5 blocks downward
-  if not nofall:
-    for i in range( 5 ):
-      if g_pos.y + 1 < g_world_size.y and get_tile( g_pos.copy().a( 0, 1 ) ) in AIR_BLOCKS:
-        g_pos.y += 1
-
-  # Regen health
-  g_hp = min( g_hp + 1, g_hp_max )
-
-  data_save()
-
-# Modify the inventory
-# Modes = pickup, remove, or set
-def update_inv( item_id, amount, mode = 'p', slot = 0 ):
-
-  global g_items
-
-  inv_keys = [] # Holds the 'keys' of the inventory
-
-  # Before doing anything else, make sure everything is properly stacked
-  for i in range( 16 ):
-
-    # Reset ID of anything with count 0
-    if g_items[i][1] == 0:
-      g_items[i][0] = 0
-    inv_keys.append( g_items[i][0] )
-
-  for i in range( len( inv_keys ) ):
-
-    # If this is a duplicate, and it isn't the first slot with this item,
-    # then add count to first slot with this item
-    if inv_keys[i] != 0 and inv_keys.count( inv_keys[i] ) != 1 and inv_keys.index( inv_keys[i] ) != i:
-      g_items[ inv_keys.index( inv_keys[i] ) ][1] += g_items[i][1]
-      g_items[i] = [ 0, 0 ]
-
-  # Pickup mode
-  if mode == 'p':
-
-    # First try to stack (MAKE SURE SLOT ISN'T EMPTY)
-    for i in range( 16 ):
-      if g_items[i][0] == item_id and g_items[i][1] > 0:
-        g_items[i][1] += amount
-        data_save()
-        return True
-
-    else:
-
-      # Then find empty slot
-      for i in range( 16 ):
-        if g_items[i][1] == 0:
-          g_items[i][0] = item_id
-          g_items[i][1] = amount
-          data_save()
-          return True
-
-    return False
-
-  # Removal mode
-  # (Returns the # of items that were able to be removed)
-  elif mode == 'r':
-
-    # Try to remove
-    for i in range( 16 ):
-      if g_items[i][0] == item_id:
-        if g_items[i][1] >= amount:
-
-          g_items[i][1] -= amount
-          data_save()
-          return amount
-
-        elif g_items[i][1] > 0:
-
-          t = g_items[i][1]
-          g_items[i][1] = 0
-          data_save()
-          return t
-
-    # Failed to remove
-    return 0
-
-  # Set mode
-  # Sets the specified slot to the provided item and amount
-  elif mode == 's':
-
-    # Check range
-    if ( 0 <= slot < 16 ):
-
-      # Modify
-      g_items[ slot ][0] = item_id
-      g_items[ slot ][1] = amount
-
-  # Test mode
-  # Tests how much of an item is present in the inventory
-  elif mode == 't':
-
-    for i in range( 16 ):
-      if g_items[i][0] == item_id:
-        return g_items[i][1]
-
-    return 0
-
-  # Update character file
-  data_save()
-
-# Create new (empty) chest
-def chest_create( x, y ):
-
-  global g_tile_special
-
-  g_tile_special[ f'{ x } : { y }' ] = {}
-  for i in range( 10 ):
-    g_tile_special[ f'{ x } : { y }' ][ f'slot{ i }' ] = '0:0'
-
-def chest_modify( x, y, item_id, amount, mode = 'i' ):
-
-  global g_tile_special
-  
-  # Insert
-  if mode == 'i':
-
-    # The same as the code for update_inv()
-    for i in range( 10 ):
-      if chest_slot( x, y, i ) == item_id and chest_slot( x, y, i, amount = True ) > 0:
-        chest_slot( x, y, i, amount, amount = True, op = '+' )
-        return True
-
-    for i in range( 10 ):
-      if chest_slot( x, y, i, amount = True ) == 0:
-        chest_slot( x, y, i, item_id, op = '=' )
-        chest_slot( x, y, i, amount, amount = True, op = '=' )
-        return True
-
-    return False
-
-  # Remove
-  elif mode == 'r':
-
-    # Try to remove
-    for i in range( 10 ):
-      if chest_slot( x, y, i ) == item_id:
-        if chest_slot( x, y, i, amount = True ) >= amount:
-
-          chest_slot( x, y, i, amount, amount = True, op = '-' )
-          data_save()
-          return amount
-
-        elif chest_slot( x, y, i, amount = True ) > 0:
-
-          chest_slot( x, y, i, 0, amount = True, op = '=' )
-          data_save()
-          return chest_slot( x, y, i, amount = True )
-
-    # Failed to remove
-    return 0
-
-def chest_remove( x, y ):
-
-  global g_tile_special
-
-  g_tile_special.pop( f'{ x } : { y }' )
-
-def chest_slot( x, y, s, a = 0, amount = False, op = '?' ):
-
-  global g_tile_special
-
-  if op == '?':
-    return int( g_tile_special[ f'{ x } : { y }' ][ f'slot{ s }' ].split( ':' )[ 1 if amount else 0 ] )
-
-  t = g_tile_special[ f'{ x } : { y }' ][ f'slot{ s }' ].split( ':' )
-  t = [ int( t[0] ), int( t[1] ) ]
-
-  if op == '=':
-    t[ 1 if amount else 0 ] = a
-  elif op in ( '+', '-' ):
-    t[ 1 if amount else 0 ] += a * ( 1 if op == '+' else -1 )
-
-  g_tile_special[ f'{ x } : { y }' ][ f'slot{ s }' ] = f'{ t[0] }:{ t[1] }'
-
-# Break a block
-def break_block( x, y ):
-
-  global g_tile_data, g_tile_special
-
-  # Make sure it's within the world boundaries
-  if not ( 0 <= x < g_world_size.x ): return
-  if not ( 0 <= y < g_world_size.y ): return
-
-  # Store what the block was, then change it
-  t = g_tile_data[ xy2c( x, y, g_world_size.x ) ]
-  g_tile_data[ xy2c( x, y, g_world_size.x ) ] = ' '
-
-  # Remove chest data if necessary
-  if t == 'c':
-    chest_remove( x, y )
-
-  data_save() # Save data
-
-  # Return what the block was
-  return t
-
-# Place a block
-def place_block( x, y ):
-
-  global g_tile_data
-
-  # Make sure it's within the world boundaries
-  if not ( 0 <= x < g_world_size.x ): return
-  if not ( 0 <= y < g_world_size.y ): return
-
-  # If the block is air, replace it
-  if g_tile_data[ xy2c( x, y, g_world_size.x ) ] == ' ':
-
-    # Get the block ID of the currently selected item ID
-    g_tile_data[ xy2c( x, y, g_world_size.x ) ] = list( ITEM_BLOCKS.keys() )[ list( ITEM_BLOCKS.values() ).index( g_items[ g_slot ][0] ) ]
-
-    # Initialize chest data if necessary
-    if g_tile_data[ xy2c( x, y, g_world_size.x ) ] == 'c':
-      chest_create( x, y )
-
-    data_save() # Save data
-    return True
-
-  # Else, return False to indicate failure
-  return False
-
-# This function exists to reduce code repetition
-def try_break_block( x, y ):
-
-  # Check whether the player is holding a pickaxe
-
-  # Not holding anything
-  if g_items[ g_slot ][1] <= 0:
-    print( f'[!] You are not holding an item!' )
-    goto_room( room_scene, '1' )
-
-  # Not holding pickaxe
-  elif g_items[ g_slot ][0] != 2:
-    print( f'[!] Item "{ item_meta( g_slot, c = 1 ) }" cannot break blocks!' )
-    goto_room( room_scene, '1' )
-
-  # Holding pickaxe
-  else:
-
-    # Break block
-    # break_block() performs bounds checking, so there's no need to check whether our break position is within the world
-    t = break_block( g_pos.x + x, g_pos.y + y )
-
-    # break_block() returns the ID of the block that was broken, which is stored in t
-    # If possible, this block is put in the player's inventory
-    if t in ITEM_BLOCKS:
-      update_inv( ITEM_BLOCKS[ t ], 1 )
-
-    # Performing a game tick prevents the player from floating above it like a cartoon character
-    tick()
-    goto_room( room_scene ) # We can now reload the room
-
-# This function also exists to reduce code repetition
-# (even though it's pretty much just an inverse of the above function)
-def try_place_block( x, y ):
-
-  # Check whether the player is holding a block
-
-  # Not holding anything
-  if g_items[ g_slot ][1] <= 0:
-    print( f'[!] You are not holding an item!' )
-    goto_room( room_scene, '1' )
-
-  # Not holding a block
-  elif g_items[ g_slot ][0] not in ITEM_BLOCKS.values():
-    print( f'[!] Item "{ item_meta( g_slot, c = 1 ) }" is not placeable!' )
-    goto_room( room_scene, '1' )
-
-  # Holding a block
-  else:
-
-    # Place block
-    # place_block() performs bounds checking, so there's no need to check whether our break position is within the world
-    t = place_block( g_pos.x + x, g_pos.y + y )
-
-    # place_block() returns whether the attempt was successful, which is stored in t
-    # If successful, one block is removed from the player's inventory
-    if t:
-      update_inv( g_items[ g_slot ][0], 1, 'r' )
-
-    # Performing a game tick prevents the player from floating above it like a cartoon character
-    tick()
-    goto_room( room_scene ) # We can now reload the room
-
 # Inventory Room
 def room_inventory( arg = "" ):
+
+  global g_items_extra
 
   # Args can be set to 1 to avoid re-printing room data
   if not ( len( arg ) > 0 and arg[0] == '1' ):
@@ -2287,14 +2410,19 @@ def room_inventory( arg = "" ):
     print( 'Inventory:' )
     for i in range( 16 ):
       j = i // 2 + ( i % 2 ) * 8
-      t = f"({ '1234567890ABCDEF'[j] }) "
-      t += ( '* ' if g_slot == j else '' ) + ( item_meta( j, c = 1 ) if g_items[j][1] != 0 else '...' )
-      t += f"  x{ g_items[j][1] }" if g_items[j][1] != 0 else ''
-      t = t[:38]
-      print( t + ' ' * ( 40 - len( t ) ), end = ( '' if j < 8 else '\n' ) )
+      item_string = f"({ '1234567890ABCDEF'[j] }) "
+      item_string += ( '* ' if g_slot == j else '' ) + ( item_meta( j, c = 1 ) if g_items[j][1] != 0 else '...' )
+      item_string += f"  x{ g_items[j][1] }" if g_items[j][1] != 0 else ''
+      item_string = item_string[:38]
+      print( item_string + ' ' * ( 40 - len( item_string ) ), end = ( '' if j < 8 else '\n' ) )
     print()
 
     # Print options
+    if len( g_items_extra ) > 0:
+      extra_item_amount = 0
+      for i in g_items_extra:
+        extra_item_amount += i[1]
+      print( f'[H] Claim hidden items (x{ extra_item_amount } total)' )
     print( '[I] Get info' )
     print( '[M] Move item' )
     print( '[T] Trash item' )
@@ -2304,8 +2432,26 @@ def room_inventory( arg = "" ):
   while True:
     p = input( '> ' ).lower()
 
+    # Hidden items
+    if p == 'h' and len( g_items_extra ) > 0:
+
+      # Iterate through each item
+      for i in g_items_extra.copy():
+
+        # Attempt to give it to the player, and remove it from their extra items
+        if update_inv( i[0], i[1] ):
+          g_items_extra.remove( i )
+
+      # Show error message if at least some extra items are still there
+      if len( g_items_extra ) > 0:
+        print( '[#] You inventory was too full to claim every item.' )
+
+      # Save modified items_extra and reload room
+      data_save()
+      goto_room( room_inventory )
+
     # Info
-    if p == 'i':
+    elif p == 'i':
 
       # Make sure inventory isn't empty
       # Without this check, there would be a possibility of getting softlocked
@@ -2336,7 +2482,7 @@ def room_inventory( arg = "" ):
           goto_room( room_inventory, '1' )
 
     # Move
-    if p == 'm':
+    elif p == 'm':
 
       # Make sure inventory isn't empty
       # Without this check, there would be a possibility of getting softlocked
@@ -2349,7 +2495,7 @@ def room_inventory( arg = "" ):
 
       # Get slot:
       print( 'Enter the item you want to move:' )
-      t = ''
+      old_p = ''
       while True:
         p = input( '> ' ).upper()
 
@@ -2358,30 +2504,30 @@ def room_inventory( arg = "" ):
           print( '[#] Enter a number from 0-9 or a letter from A-F.' )
 
         # Make sure source slot has an item in it
-        elif t == '' and g_items[ list( '1234567890ABCDEF' ).index( p ) ][1] == 0:
+        elif old_p == '' and g_items[ list( '1234567890ABCDEF' ).index( p ) ][1] == 0:
           print( '[#] This slot is empty.' )
 
         # Set source slot and move onto getting destination slot
-        elif t == '':
+        elif old_p == '':
           print( 'Enter the slot you want to move it to:' )
-          t = p
+          old_p = p
 
         # Move item and re-show inventory
         else:
 
           # Shorten indices/store swap buffer
-          t = list( '1234567890ABCDEF' ).index( t )
+          old_p = list( '1234567890ABCDEF' ).index( old_p )
           p = list( '1234567890ABCDEF' ).index( p )
-          swap_buffer = g_items[t].copy()
+          swap_buffer = g_items[old_p].copy()
 
           # Swap, print message, and re-show inventory
-          update_inv( *g_items[p], mode = 's', slot = t )
+          update_inv( *g_items[p], mode = 's', slot = old_p )
           update_inv( *swap_buffer, mode = 's', slot = p )
-          print( f'[!] Moved "{ item_meta( p, c = 1 ) }".' if g_items[t][1] == 0 else f'[!] Swapped "{ item_meta( p, c = 1 ) }" and "{ item_meta( t, c = 1 ) }"' )
+          print( f'[!] Moved "{ item_meta( p, c = 1 ) }".' if g_items[t][1] == 0 else f'[!] Swapped "{ item_meta( p, c = 1 ) }" and "{ item_meta( old_p, c = 1 ) }"' )
           goto_room( room_inventory )
 
     # Trash
-    if p == 't':
+    elif p == 't':
 
       # Make sure inventory isn't empty
       # Without this check, there would be a possibility of getting softlocked
@@ -2422,7 +2568,7 @@ def room_inventory( arg = "" ):
       goto_room( room_crafting )
 
     # Back
-    if p == 'q':
+    elif p == 'q':
       goto_room( room_scene )
 
     # Invalid input
@@ -2490,7 +2636,7 @@ def room_crafting( arg = '' ):
     # Get ingredients/craft
     elif p == 'i' or p == 'c':
 
-      t = p # Store in a temporary variable
+      i_or_c = p # Store in a temporary variable
 
       # Get slot
       print( 'Enter the recipe you want ' + ( 'the ingredients of' if p == 'i' else 'to use' ) + ':' )
@@ -2511,22 +2657,22 @@ def room_crafting( arg = '' ):
             break
       
       # Show ingredients
-      if t == 'i':
+      if i_or_c == 'i':
 
-        t = page * 8 + ( p - 1 ) # Shortening selected slot
+        slot_num = page * 8 + ( p - 1 ) # Shortening selected slot
   
         # Print data
-        print( f"Required ingredients for \"{ item_meta( RECIPES[t]['res'][0] ) }\":" )
-        for i in RECIPES[t]['req']:
-          print( f"- { item_meta( i ) } x{ RECIPES[t]['req'][i] }" )
+        print( f"Required ingredients for \"{ item_meta( RECIPES[slot_num]['res'][0] ) }\":" )
+        for i in RECIPES[slot_num]['req']:
+          print( f"- { item_meta( i ) } x{ RECIPES[slot_num]['req'][i] }" )
   
         # Reload room
         goto_room( room_crafting, '1' + str( page ) )
 
       # Alternatively, craft the item
-      elif t == 'c':
+      elif i_or_c == 'c':
 
-        t = page * 8 + ( p - 1 ) # Shortening selected slot
+        slot_num = page * 8 + ( p - 1 ) # Shortening selected slot
 
         # Get the quantity
         print( 'Enter the number of times you want to craft it:' )
@@ -2554,20 +2700,20 @@ def room_crafting( arg = '' ):
         can_craft = True
 
         # Iterate through required materials, seeing which are missing
-        for i in RECIPES[t]['req']:
-          if update_inv( i, 0, mode = 't' ) < RECIPES[t]['req'][i] * p:
+        for i in RECIPES[slot_num]['req']:
+          if update_inv( i, 0, mode = 't' ) < RECIPES[slot_num]['req'][i] * p:
             can_craft = False
-            print( f"[#] You need { RECIPES[t]['req'][i] * p - update_inv( i, 0, mode = 't' ) } more \"{ item_meta( i ) }\"." )
+            print( f"[#] You need { RECIPES[slot_num]['req'][i] * p - update_inv( i, 0, mode = 't' ) } more \"{ item_meta( i ) }\"." )
 
         # Continue onward if they have all the items
         if can_craft:
 
           # Take the ingredients, then give them the resultant item
-          for i in RECIPES[t]['req']:
-            update_inv( i, RECIPES[t]['req'][i] * p, mode = 'r' )
-          update_inv( RECIPES[t]['res'][0], RECIPES[t]['res'][1] * p, mode = 'p' )
+          for i in RECIPES[slot_num]['req']:
+            update_inv( i, RECIPES[slot_num]['req'][i] * p, mode = 'r' )
+          update_inv( RECIPES[slot_num]['res'][0], RECIPES[slot_num]['res'][1] * p, mode = 'p' )
 
-          print( f"[!] You crafted \"{ item_meta( RECIPES[t]['res'][0] ) }\" x{ RECIPES[t]['res'][1] * p }." )
+          print( f"[!] You crafted \"{ item_meta( RECIPES[slot_num]['res'][0] ) }\" x{ RECIPES[slot_num]['res'][1] * p }." )
 
           # Reload room
           goto_room( room_crafting, '!' + str( page ) )
@@ -2598,8 +2744,8 @@ def room_chest( arg = '' ):
     print( 'ERROR: Chest data not supplied.' )
     goto_room( 0 )
 
-  t1 = V2( int( arg.split( ',' )[1] ), int( arg.split( ',' )[2] ) )
-  if f'{ t1.x } : { t1.y }' not in g_tile_special:
+  chest_coords = V2( int( arg.split( ',' )[1] ), int( arg.split( ',' )[2] ) )
+  if f'{ chest_coords.x } : { chest_coords.y }' not in g_tile_special:
     print( 'ERROR: Chest not at block.' )
     goto_room( 0 )
   
@@ -2611,22 +2757,22 @@ def room_chest( arg = '' ):
     print( 'Chest:' )
     for i in range( 10 ):
       j = i // 2 + ( i % 2 ) * 5
-      t = f"({ '1234567890'[j] }) "
-      t += ( item_meta( chest_slot( *t1.l(), j ) ) if chest_slot( *t1.l(), j, amount = True ) != 0 else '...' )
-      t += f"  x{ chest_slot( *t1.l(), j, amount = True ) }" if chest_slot( *t1.l(), j, amount = True ) != 0 else ''
-      t = t[:38]
-      print( t + ' ' * ( 40 - len( t ) ), end = ( '' if j < 5 else '\n' ) )
+      item_string = f"({ '1234567890'[j] }) "
+      item_string += ( item_meta( chest_slot( *chest_coords.l(), j ) ) if chest_slot( *chest_coords.l(), j, amount = True ) != 0 else '...' )
+      item_string += f"  x{ chest_slot( *chest_coords.l(), j, amount = True ) }" if chest_slot( *chest_coords.l(), j, amount = True ) != 0 else ''
+      item_string = item_string[:38]
+      print( item_string + ' ' * ( 40 - len( item_string ) ), end = ( '' if j < 5 else '\n' ) )
     print()
 
     # Also print inventory for reference
     print( 'Inventory:' )
     for i in range( 16 ):
       j = i // 2 + ( i % 2 ) * 8
-      t = f"({ '1234567890ABCDEF'[j] }) "
-      t += ( '* ' if g_slot == j else '' ) + ( item_meta( j, c = 1 ) if g_items[j][1] != 0 else '...' )
-      t += f"  x{ g_items[j][1] }" if g_items[j][1] != 0 else ''
-      t = t[:38]
-      print( t + ' ' * ( 40 - len( t ) ), end = ( '' if j < 8 else '\n' ) )
+      item_string = f"({ '1234567890ABCDEF'[j] }) "
+      item_string += ( '* ' if g_slot == j else '' ) + ( item_meta( j, c = 1 ) if g_items[j][1] != 0 else '...' )
+      item_string += f"  x{ g_items[j][1] }" if g_items[j][1] != 0 else ''
+      item_string = item_string[:38]
+      print( item_string + ' ' * ( 40 - len( item_string ) ), end = ( '' if j < 8 else '\n' ) )
     print()
 
     print( '[I] Insert item' )
@@ -2663,7 +2809,7 @@ def room_chest( arg = '' ):
         else:
 
           # Get count
-          t = list( '1234567890ABCDEF' ).index( p )
+          slot_num = list( '1234567890ABCDEF' ).index( p )
           print( 'Enter how much you want to put in: ' )
           while True:
             p = input( '> ' ).lower()
@@ -2676,8 +2822,8 @@ def room_chest( arg = '' ):
             else:
 
               # Attempt to insert item (reload chest)
-              if chest_modify( *t1.l(), g_items[t][0], min( g_items[t][1], p ) ):
-                g_items[t][1] -= min( g_items[t][1], p )
+              if chest_modify( *chest_coords.l(), g_items[slot_num][0], min( g_items[slot_num][1], p ) ):
+                g_items[slot_num][1] -= min( g_items[slot_num][1], p )
                 goto_room( room_chest, '0' + arg[1:] )
 
               else:
@@ -2689,7 +2835,7 @@ def room_chest( arg = '' ):
 
       # Make sure chest isn't empty
       for i in range( 10 ):
-        if chest_slot( *t1.l(), i ) != 0:
+        if chest_slot( *chest_coords.l(), i ) != 0:
           break
       else:
         print( '[#] This chest is empty.' )
@@ -2705,13 +2851,13 @@ def room_chest( arg = '' ):
           print( '[#] Enter a number from 0-9.' )
 
         # Make sure it has an item in it
-        elif chest_slot( *t1.l(), list( '1234567890' ).index( p ), amount = True ) == 0:
+        elif chest_slot( *chest_coords.l(), list( '1234567890' ).index( p ), amount = True ) == 0:
           print( '[#] This slot is empty.' )
 
         else:
 
           # Get count
-          t = list( '1234567890' ).index( p )
+          slot_num = list( '1234567890' ).index( p )
           print( 'Enter how much you want to take: ' )
           while True:
             p = input( '> ' ).lower()
@@ -2724,8 +2870,8 @@ def room_chest( arg = '' ):
             else:
 
               # Attempt to take item (reload chest)
-              if update_inv( chest_slot( *t1.l(), t ), min( chest_slot( *t1.l(), t ), p ) ):
-                chest_slot( *t1.l(), t, chest_slot( *t1.l(), t, amount = True ) - min( chest_slot( *t1.l(), t, amount = True ), p ), amount = True, op = '=' )
+              if update_inv( chest_slot( *chest_coords.l(), slot_num ), min( chest_slot( *chest_coords.l(), slot_num ), p ) ):
+                chest_slot( *chest_coords.l(), slot_num, chest_slot( *chest_coords.l(), slot_num, amount = True ) - min( chest_slot( *chest_coords.l(), slot_num, amount = True ), p ), amount = True, op = '=' )
                 goto_room( room_chest, '0' + arg[1:] )
 
               else:
@@ -2739,16 +2885,6 @@ def room_chest( arg = '' ):
     # Invalid input
     else:
       print( '[#] Unknown command.' )
-
-def start_fight( monster_id ):
-  
-  global g_monster
-  g_monster = Monster( monster_id )
-  
-  print_line()
-  input( f"You encountered a { g_monster.name.replace( '_', ' ' ).title() }! " )
-  
-  goto_room( room_fight )
 
 def room_fight():
 
