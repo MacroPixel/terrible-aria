@@ -166,15 +166,15 @@ class Monster:
   # The player's options for each player turn
   # Format: [ Letter ID, Action Name, Requirements ]
   PLAYER_ATTACKS = {
-    'slime' : [ [ 's', 'Swing sword' ], [ 'f', 'Shoot forward' ], [ 'u', 'Shoot upward' ] ],
-    'zombie' : [ [ 's', 'Swing sword' ], [ 'f', 'Shoot forward' ], [ 'u', 'Shoot upward' ] ],
-    'demon_eye' : [ [ 's', 'Jump and swing sword (*)' ], [ 'r', 'Shoot rightward' ], [ 'l', 'Shoot leftward' ] ],
-    'cave_bat' : [ [ 's', 'Jump and swing sword' ], [ 'f', 'Shoot forward' ], [ 'r', 'Shoot rightward' ] ],
-    'skeleton' : [ [ 's', 'Swing sword (*)' ], [ 'j', 'Jump and swing sword' ], [ 'u', 'Shoot upward' ],
-      [ 'r', 'Shoot rightward' ], [ 'l', 'Shoot leftward' ] ],
-    'undead_miner' : [ [ 's', 'Swing sword' ], [ 'a', 'Shoot arrow' ] ],
-    'harpy' : [ [ 'g', 'Throw grenade' ], [ 'r', 'Shoot rightward' ], [ 'l', 'Shoot leftward' ] ],
-    'tim' : [ [ 's', 'Swing sword' ], [ 'a', 'Shoot arrow' ], [ 'g', 'Throw grenade' ], [ 'n', 'Do nothing' ] ]
+    'slime' : [ [ 's', 'Swing sword', 's' ], [ 'f', 'Shoot forward', 'b' ], [ 'u', 'Shoot upward', 'b' ] ],
+    'zombie' : [ [ 's', 'Swing sword', 's' ], [ 'f', 'Shoot forward', 'b' ], [ 'u', 'Shoot upward', 'b' ] ],
+    'demon_eye' : [ [ 's', 'Jump and swing sword (*)', 's' ], [ 'r', 'Shoot rightward', 'b' ], [ 'l', 'Shoot leftward', 'b' ] ],
+    'cave_bat' : [ [ 's', 'Jump and swing sword', 's' ], [ 'f', 'Shoot forward', 'b' ], [ 'r', 'Shoot rightward', 'b' ] ],
+    'skeleton' : [ [ 's', 'Swing sword (*)', 's' ], [ 'j', 'Jump and swing sword', 's' ], [ 'u', 'Shoot upward', 'b' ],
+      [ 'r', 'Shoot rightward', 'b' ], [ 'l', 'Shoot leftward', 'b' ] ],
+    'undead_miner' : [ [ 's', 'Swing sword', 's' ], [ 'a', 'Shoot arrow', 'b' ] ],
+    'harpy' : [ [ 'g', 'Throw grenade', 'g' ], [ 'r', 'Shoot rightward', 'b' ], [ 'l', 'Shoot leftward', 'b' ] ],
+    'tim' : [ [ 's', 'Swing sword', 's' ], [ 'a', 'Shoot arrow', 'b' ], [ 'g', 'Throw grenade', 'g' ], [ 'n', 'Do nothing' ] ]
   }
 
   # The monster's options for each player turn
@@ -412,6 +412,238 @@ class Monster:
       self.move_c = self.move
 
   # Deals damage to self, allowing a random range and multiplier to be used
+  def damage( self, a, b = 'NONE', method = '', entity = 'self' ):
+
+    global g_hp
+
+    if b == 'NONE':
+      amount = a
+    else:
+      amount = random.randint( a, b )
+
+    # multiply damage based on stronger weapons/armor
+    if method == 's':
+      amount *= ( 1, 1.2, 1.6, 2.0 )[ ( 'copper', 'iron', 'silver', 'gold' ).index( self.weapon_melee ) ]
+    if method == 'b':
+      amount *= ( 1, 1.2, 1.5, 1.8 )[ ( 'wood', 'iron', 'silver', 'gold' ).index( self.weapon_bow[0] ) ]
+    if method == 'b':
+      amount *= ( 1, 2 )[ ( 'arrow', 'flame_arrow' ).index( self.weapon_bow[1] ) ]
+    if entity == 'you':
+      amount *= ( 1, 0.7, 0.3, 0.05 )[ ( 'none', 'iron', 'silver', 'gold' ).index( self.armor ) ]
+
+    if entity == 'self':
+      self.hp -= amount
+    else:
+      g_hp -= amount
+    return amount
+
+  def update_stats( self ):
+
+    # Determine sword
+    self.weapon_melee = 'none'
+    if update_inv( I_C_SSWORD, 0, mode = 't' ) > 0:
+      self.weapon_melee = 'copper'
+    if update_inv( I_I_SWORD, 0, mode = 't' ) > 0:
+      self.weapon_melee = 'iron'
+    if update_inv( I_S_SWORD, 0, mode = 't' ) > 0:
+      self.weapon_melee = 'silver'
+    if update_inv( I_G_SWORD, 0, mode = 't' ) > 0:
+      self.weapon_melee = 'gold'
+
+    # Determine bow
+    self.weapon_bow = [ 'none', 'none' ]
+    if update_inv( I_W_BOW, 0, mode = 't' ) > 0:
+      self.weapon_bow[0] = 'wood'
+    if update_inv( I_I_BOW, 0, mode = 't' ) > 0:
+      self.weapon_bow[0] = 'iron'
+    if update_inv( I_S_BOW, 0, mode = 't' ) > 0:
+      self.weapon_bow[0] = 'silver'
+    if update_inv( I_G_BOW, 0, mode = 't' ) > 0:
+      self.weapon_bow[0] = 'gold'
+    if update_inv( I_ARROW, 0, mode = 't' ) > 0:
+      self.weapon_bow[1] = 'arrow'
+    if update_inv( I_F_ARROW, 0, mode = 't' ) > 0:
+      self.weapon_bow[1] = 'flame_arrow'
+
+    # Determine grenade
+    self.weapon_grenade = 'none'
+    if update_inv( I_GRENADE, 0, mode = 't' ) > 0: self.weapon_grenade = 'grenade'
+
+    # Determine armor
+    self.armor = 'none'
+    if update_inv( I_I_ARMOR, 0, mode = 't' ) > 0: self.armor = 'iron'
+    if update_inv( I_S_ARMOR, 0, mode = 't' ) > 0: self.armor = 'silver'
+    if update_inv( I_G_ARMOR, 0, mode = 't' ) > 0: self.armor = 'gold'
+
+  def get_options( self, player_turn, should_print = True ):
+
+    self.update_stats() # Query weapon, armor, etc.
+
+    options_list = []
+    for s in ( self.PLAYER_ATTACKS[ self.name ] if player_turn else self.PLAYER_DODGES[ self.name ] ):
+
+      # Throw out weapon choice if the player doesn't have the required item
+      if len( s ) > 2 and s[2] == 's' and self.weapon_melee == 'none':
+        continue
+      if len( s ) > 2 and s[2] == 'b' and self.weapon_bow[0] == 'none':
+        continue
+      if len( s ) > 2 and s[2] == 'b' and self.weapon_bow[1] == 'none':
+        continue
+      if len( s ) > 2 and s[2] == 'g' and self.weapon_grenade == 'none':
+        continue
+
+      # Format print message based on keycode and items required for it
+      if should_print:
+
+        suffix = ''
+        if len( s ) > 2 and s[2] == 's':
+          suffix += f"({ ( 'Copper Shortsword', 'Iron Broadsword', 'Silver Broadsword', 'Gold Broadsword' )[ ( 'copper', 'iron', 'silver', 'gold' ).index( self.weapon_melee ) ] })"
+        if len( s ) > 2 and s[2] == 'b':
+          suffix += f"({ ( 'Bow', 'Iron Bow', 'Silver Bow', 'Gold Bow' )[ ( 'wood', 'iron', 'silver', 'gold' ).index( self.weapon_bow[0] ) ] } + "
+          suffix += f"{ ( 'Arrow', 'Flaming Arrow' )[ ( 'arrow', 'flame_arrow' ).index( self.weapon_bow[1] ) ] } x"
+          suffix += f"{ update_inv( ( I_ARROW, I_F_ARROW )[ ( 'arrow', 'flame_arrow' ).index( self.weapon_bow[1] ) ], 0, mode = 't' ) })"
+        if len( s ) > 2 and s[2] == 'g':
+          suffix += f"(Grenade x{ update_inv( I_GRENADE, 0, mode = 't' ) })"
+
+        print( f'[{ s[0].upper() }] { s[1] } { suffix }' )
+      options_list.append( s[0].lower() )
+
+    return options_list
+  
+  def player_turn( self, p ):
+
+    self.update_stats() # Query weapon, armor, etc.
+
+    # Set temporary variables
+    result = self.P_TURN_RESULTS[ f'{ self.name } : { p } : { self.MONSTER_DODGES[ self.name ][ self.move ] }' ]
+
+    # Evaluate chance
+    if result[0] == 'chance':
+      temp_rand = random.randint( 0, 99 )
+      for i in result[1]:
+        if ( i[0] <= temp_rand <= i[1] ):
+          result = self.P_TURN_RESULTS[ f'{ self.name } : { p } : { self.MONSTER_DODGES[ self.name ][ self.move ] } : { i[2] }' ]
+          break
+      else:
+        print( "ERROR: Random values don't add up to 100." )
+
+    if len( result ) == 1: result.append( 0 )
+    if len( result ) == 2: result.append( 'e' )
+
+    # Get method
+    for i in self.PLAYER_ATTACKS:
+      print( i[0], p )
+    dmg_method = [ i for i in self.PLAYER_ATTACKS[ self.name ] if i[0] == p ][0]
+    dmg_method = ( '' if len( dmg_method ) < 3 else dmg_method[2] )
+
+    # Display text/subtract HP
+    print( '[!] ' + result[0] )
+    print( '[*] ' + ( 'Enemy' if result[2] == 'e' else 'You' ) + ': ', end = '' )
+    print( '-' + str( self.damage( *result[1], entity = 'self' if result[2] == 'e' else 'you', method = dmg_method ) ), end = '' )
+    print( ' HP' if result[1] != 0 else 'NO DAMAGE' )
+
+    # Charge/heal (Tim exclusive)
+    if ( self.MONSTER_DODGES[ self.name ][ self.move ] == 'heal' ): print( f'[*] Enemy: +{ -self.damage( -10, -1 ) } HP' )
+    self.charged = ( self.MONSTER_DODGES[ self.name ][ self.move ] == 'charge attack' )
+    if self.charged: print( '[*] Enemy: +50% DMG next turn' )
+
+    # Check if fight is over
+    self.hp_check()
+
+    # Advance move
+    self.advance_move()
+  
+  def monster_turn( self, p ):
+
+    self.update_stats() # Query weapon, armor, etc.
+
+    # Set temporary variables
+    result = self.M_TURN_RESULTS[ f'{ self.name } : { p } : { self.MONSTER_ATTACKS[ self.name ][ self.move ] }' ]
+
+    # Evaluate chance
+    if result[0] == 'chance':
+      temp_rand = random.randint( 0, 99 )
+      for i in result[1]:
+        if ( i[0] <= temp_rand <= i[1] ):
+          result = self.M_TURN_RESULTS[ f'{ self.name } : { p } : { self.MONSTER_ATTACKS[ self.name ][ self.move ] } : { i[2] }' ]
+          break
+      else:
+        print( "ERROR: Random values don't add up to 100." )
+
+    if len( result ) == 1: result.append( 0 )
+    if isinstance( result[1], int ): result[1] = ( result[1] )
+    if len( result ) == 2: result.append( 'p' )
+
+    print( '[!] ' + result[0] )
+    print( '[*] ' + ( 'Enemy' if result[2] == 'e' else 'You' ) + ': ' + ( '-' + str( self.damage( *result[1], entity = 'self' if result[2] == 'e' else 'you', method = '' ) ) + ' HP' if result[1] != 0 else 'NO DAMAGE' ) )
+
+    # Check if fight is over
+    self.hp_check()
+
+    # Advance move
+    self.advance_move()
+
+  # Checks if either entity has died
+  def hp_check( self ):
+
+    if self.hp <= 0:
+      print_line()
+      print( f"[!] { self.name.replace( '_', ' ' ).title() } was killed." )
+      input( '[!] Press enter to exit the fight. ' )
+      goto_room( room_scene )
+
+    if g_hp <= 0:
+      print_line()
+      print( f"[!] { self.name.replace( '_', ' ' ).title() } won." )
+      input( '[!] Press enter to exit the fight. ' )
+      goto_room( room_death )
+
+  def advance_move( self ):
+
+    if self.name == 'slime':
+      self.move_c += 1
+      if self.move_c % 2 == 0:
+        self.move = ( 1 - self.move )
+
+    elif self.name == 'zombie':
+      self.move_c += 1
+      if self.move_c % 3 == 0:
+        self.move = 1 - self.move
+
+    elif self.name == 'demon_eye':
+      self.move_c += 1
+      self.move = ( self.move_0 ) if ( self.move_c % 6 in ( 0, 2, 3 ) ) else ( 1 - self.move_0 )
+
+    elif self.name == 'cave_bat':
+      self.move_c += ( 1 if self.move_0 != 1 else -1 )
+      self.move = self.move_c % 3
+
+    elif self.name == 'skeleton':
+      self.move_c += 1
+      self.move = ( ( 0, 1, 2, 3, 3, 2, 1 )[ self.move_c % 7 ] + self.move_0 ) % 4
+
+    elif self.name == 'undead_miner':
+      self.move_c += 1
+      self.move = ( self.move_0 ) if ( self.move_c % 5 == 0 ) else ( 1 - self.move_0 )
+    
+    elif self.name == 'harpy':
+      self.move = random.choice( [ m for m in [ 0, 1, 2 ] if m != self.move ] )
+
+    elif self.name == 'tim':
+      self.move_c += 1
+      self.move = ( self.move + 1 + ( 1 if self.move_c % ( 2 * ( self.move_0 + 1 ) ) == 0 else 0 ) ) % 4
+
+# Eye of Cthulhu
+class EyeOfCthulhu:
+
+  def __init__( self ):
+
+    self.hp = 2048
+
+    self.move = [ random.randint( 0, 3 ), random.choice( list( 'abc' ) ) ]
+    self.move_0 = self.move
+
+  # Deals damage to self, allowing a random range and multiplier to be used
   def damage( self, a, b = 'NONE', m = 1, entity = 'self' ):
 
     global g_hp
@@ -516,38 +748,7 @@ class Monster:
 
   def advance_move( self ):
 
-    if self.name == 'slime':
-      self.move_c += 1
-      if self.move_c % 2 == 0:
-        self.move = ( 1 - self.move )
-
-    elif self.name == 'zombie':
-      self.move_c += 1
-      if self.move_c % 3 == 0:
-        self.move = 1 - self.move
-
-    elif self.name == 'demon_eye':
-      self.move_c += 1
-      self.move = ( self.move_0 ) if ( self.move_c % 6 in ( 0, 2, 3 ) ) else ( 1 - self.move_0 )
-
-    elif self.name == 'cave_bat':
-      self.move_c += ( 1 if self.move_0 != 1 else -1 )
-      self.move = self.move_c % 3
-
-    elif self.name == 'skeleton':
-      self.move_c += 1
-      self.move = ( ( 0, 1, 2, 3, 3, 2, 1 )[ self.move_c % 7 ] + self.move_0 ) % 4
-
-    elif self.name == 'undead_miner':
-      self.move_c += 1
-      self.move = ( self.move_0 ) if ( self.move_c % 5 == 0 ) else ( 1 - self.move_0 )
-    
-    elif self.name == 'harpy':
-      self.move = random.choice( [ m for m in [ 0, 1, 2 ] if m != self.move ] )
-
-    elif self.name == 'tim':
-      self.move_c += 1
-      self.move = ( self.move + 1 + ( 1 if self.move_c % ( 2 * ( self.move_0 + 1 ) ) == 0 else 0 ) ) % 4
+    pass
 
 # Switches rooms
 def goto_room( room, arg = '' ):
@@ -593,7 +794,7 @@ def tick( nofall = False ):
     for i in range( 5 ):
 
       # Move
-      if g_pos.y + 1 < g_world_size.y and get_tile( g_pos.copy().a( 0, 1 ) ) in AIR_BLOCKS:
+      if g_pos.y + 1 < g_world_size.y and get_tile( g_pos.copy().a( 0, 1 ) ) in [ i for i in AIR_BLOCKS if i not in PLATFORM_BLOCKS ]:
         g_pos.y += 1
 
   # Start fight
@@ -611,7 +812,7 @@ def tick( nofall = False ):
 # Modes = pickup, remove, or set
 def update_inv( item_id, amount, mode = 'p', slot = 0 ):
 
-  global g_items
+  global g_items, g_items_extra
 
   inv_keys = [] # Holds the 'keys' of the inventory
 
@@ -651,6 +852,7 @@ def update_inv( item_id, amount, mode = 'p', slot = 0 ):
           data_save()
           return True
 
+    g_items_extra.append( [ item_id, amount ] )
     return False
 
   # Removal mode
@@ -983,6 +1185,14 @@ I_SUS_EYE = 25
 I_GRENADE = 26
 I_HEALTH_POTION = 27
 I_CRYSTAL = 28
+I_MAGIC_STAFF = 29
+I_TROPHY = 30
+I_MEGA_CRYSTAL = 31
+I_SHACKLE = 32
+I_HARPY_WINGS = 33
+I_I_ARMOR = 34
+I_S_ARMOR = 35
+I_G_ARMOR = 36
 
 ITEM_META = [
   [ 'NULL', 'An item you shouldn\'t have' ],
@@ -1013,13 +1223,22 @@ ITEM_META = [
   [ 'Sus Eye', 'Description' ],
   [ 'Grenade', 'Description' ],
   [ 'Healing Potion', 'Usable anytime.\nGrants +100 HP.' ],
-  [ 'Life Crystal', 'Increases MHP by 20 HP.' ]
+  [ 'Life Crystal', 'Increases MHP by 20 HP.' ],
+  [ 'Magic Staff', 'Description' ],
+  [ 'Trophy', 'That\'s it. That\'s all you get.' ],
+  [ 'Mega Crytstal', 'Description' ],
+  [ 'Shackle', 'Description' ],
+  [ 'Harpy Wings', 'More Jumping' ],
+  [ 'Iron Armor', 'More Jumping' ],
+  [ 'Silver Armor', 'More Jumping' ],
+  [ 'Gold Armor', 'More Jumping' ]
 ]
 
 # GLOBAL CONSTANTS
 DEBUG = True
-SHOW_PROG = True
-AIR_BLOCKS = [ ' ', 'l', 'L', 'c', 'C' ]
+SHOW_PROG = False
+AIR_BLOCKS = [ ' ', 'l', 'L', 'c', 'C', 'p' ]
+PLATFORM_BLOCKS = [ 'p' ]
 ITEM_BLOCKS = { 'g': I_GRASS, 's': I_STONE, 'w': I_WOOD, 'l': I_WOOD, 'i': I_IRON_ORE, 'S': I_SILVER_ORE, 'G': I_GOLD_ORE,
   'p': I_PLATFORM, 'c': I_CHEST, 'C': I_CRYSTAL }
 
@@ -1171,8 +1390,8 @@ def data_char_info( name ):
   # Print info
   print( f"Name: { name }" )
   print( f"HP: { file[1][4:].split( ',' )[0] } / { file[1][4:].split( ',' )[1] }" )
-  print( f"Deaths: { file[3][8:] }" )
-  print( f"Play Time: { format_playtime( int( file[4][11:] ) ) }" )
+  print( f"Deaths: { file[4][8:] }" )
+  print( f"Play Time: { format_playtime( int( file[5][11:] ) ) }" )
 
 # Write back to the character file if something changed
 def data_char_update( name ):
@@ -1842,7 +2061,7 @@ def room_world_select():
             else:
 
               # Show info
-              data_world_info( t )
+              data_world_info( temp_name )
 
             # Re-show world list
             goto_room( room_world_select )
@@ -1978,6 +2197,7 @@ def room_scene( arg = '' ):
       print( '[H <command name>] Help with a specific command' )
       print( '[M] Move in direction' )
       print( '[J] Jump' )
+      print( '[D] Move down' )
       print( '[W] Wait' )
       print( '[I] Inventory' )
       print( '[S] Select item' )
@@ -2005,6 +2225,9 @@ def room_scene( arg = '' ):
       elif p[2:] == 'j':
         print( '[?] Syntax: j [height (5)]' )
         print( '[?] Effect: Jumps the specified height.' )
+      elif p[2:] == 'd':
+        print( '[?] Syntax: d' )
+        print( '[?] Effect: Moves downward through pseudo-solid blocks' )
       elif p[2:] == 'w':
         print( '[?] Syntax: w' )
         print( '[?] Effect: Allows a game tick to pass without the player performing an action.' )
@@ -2146,6 +2369,15 @@ def room_scene( arg = '' ):
           data_save()
           tick( nofall = True )
           goto_room( room_scene )
+    
+    # Down command
+    elif p == 'd':
+    
+      # Go through platform
+      if g_pos.y < g_world_size.y - 1 and get_tile( g_pos.copy().a( 0, 1 ) ) == 'p':
+        g_pos.a( 0, 1 )
+      tick()
+      goto_room( room_scene )
 
     # Wait
     elif p == 'w':
@@ -2934,7 +3166,7 @@ def room_fight():
 
     # Escape
     elif p == '!':
-      if random.choice( ( True, False, False ) ):
+      if random.randint( 1, 15 ) <= ( 5 if update_inv( I_SHACKLE, 0, mode = 't' ) == 0 else 12 ):
         print( '[!] You successfully escaped.' )
         input( '[!] Press enter to exit the fight. ' )
         goto_room( room_scene )
