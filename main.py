@@ -152,6 +152,8 @@ class V2:
     return c
 
 # Monster class
+# This class (mainly the player_turn() and monster_turn() functions) is a little bit of a mess,
+# but there's no way of fixing it that would be worth my time at the moment
 class Monster:
 
   # I don't think I need to explain what this list is for
@@ -166,14 +168,14 @@ class Monster:
   # The player's options for each player turn
   # Format: [ Letter ID, Action Name, Requirements ]
   PLAYER_ATTACKS = {
-    'slime' : [ [ 's', 'Swing sword', 's' ], [ 'f', 'Shoot forward', 'b' ], [ 'u', 'Shoot upward', 'b' ] ],
-    'zombie' : [ [ 's', 'Swing sword', 's' ], [ 'f', 'Shoot forward', 'b' ], [ 'u', 'Shoot upward', 'b' ] ],
-    'demon_eye' : [ [ 's', 'Jump and swing sword (*)', 's' ], [ 'r', 'Shoot rightward', 'b' ], [ 'l', 'Shoot leftward', 'b' ] ],
-    'cave_bat' : [ [ 's', 'Jump and swing sword', 's' ], [ 'f', 'Shoot forward', 'b' ], [ 'r', 'Shoot rightward', 'b' ] ],
+    'slime' : [ [ 's', 'Swing sword', 's' ], [ 'f', 'Shoot forward', 'b' ], [ 'u', 'Shoot upward', 'b' ], [ 'n', 'Do nothing' ] ],
+    'zombie' : [ [ 's', 'Swing sword', 's' ], [ 'f', 'Shoot forward', 'b' ], [ 'u', 'Shoot upward', 'b' ], [ 'n', 'Do nothing' ] ],
+    'demon_eye' : [ [ 's', 'Jump and swing sword (*)', 's' ], [ 'r', 'Shoot rightward', 'b' ], [ 'l', 'Shoot leftward', 'b' ], [ 'n', 'Do nothing' ] ],
+    'cave_bat' : [ [ 's', 'Jump and swing sword', 's' ], [ 'f', 'Shoot forward', 'b' ], [ 'r', 'Shoot rightward', 'b' ], [ 'n', 'Do nothing' ] ],
     'skeleton' : [ [ 's', 'Swing sword (*)', 's' ], [ 'j', 'Jump and swing sword', 's' ], [ 'u', 'Shoot upward', 'b' ],
-      [ 'r', 'Shoot rightward', 'b' ], [ 'l', 'Shoot leftward', 'b' ] ],
-    'undead_miner' : [ [ 's', 'Swing sword', 's' ], [ 'a', 'Shoot arrow', 'b' ] ],
-    'harpy' : [ [ 'g', 'Throw grenade', 'g' ], [ 'r', 'Shoot rightward', 'b' ], [ 'l', 'Shoot leftward', 'b' ] ],
+      [ 'r', 'Shoot rightward', 'b' ], [ 'l', 'Shoot leftward', 'b' ], [ 'n', 'Do nothing' ] ],
+    'undead_miner' : [ [ 's', 'Swing sword', 's' ], [ 'a', 'Shoot arrow', 'b' ], [ 'n', 'Do nothing' ] ],
+    'harpy' : [ [ 'g', 'Throw grenade', 'g' ], [ 'r', 'Shoot rightward', 'b' ], [ 'l', 'Shoot leftward', 'b' ], [ 'n', 'Do nothing' ] ],
     'tim' : [ [ 's', 'Swing sword', 's' ], [ 'a', 'Shoot arrow', 'b' ], [ 'g', 'Throw grenade', 'g' ], [ 'n', 'Do nothing' ] ]
   }
 
@@ -198,12 +200,16 @@ class Monster:
     'slime : f : sit' : [ 'The enemy remained stationary and was hit by your arrow.', ( 8, 16 ) ],
     'slime : u : jump' : [ 'The enemy jumped into your arrow.', ( 8, 16 ) ],
     'slime : u : sit' : [ 'The enemy remained stationary, so your arrow missed.' ],
+    'slime : n : jump' : [ 'The enemy jumped, and you didn\'t attack it.' ],
+    'slime : n : sit' : [ 'The enemy remained stationary, and you didn\'t attack it.' ],
     'zombie : s : jump' : [ 'The enemy jumped over your sword.' ],
     'zombie : s : move backward' : [ 'The enemy moved backward, but was still hit by your sword.', ( 12, 24 ) ],
     'zombie : f : jump' : [ 'The enemy jumped over your arrow.' ],
     'zombie : f : move backward' : [ 'The enemy moved backward, but was still hit by your arrow.', ( 8, 16 ) ],
     'zombie : u : jump' : [ 'The enemy jumped into your arrow.', ( 8, 16 ) ],
     'zombie : u : move backward' : [ 'The enemy moved backward, so your arrow missed.' ],
+    'zombie : n : jump' : [ 'The enemy jumped, and you didn\'t attack it.' ],
+    'zombie : n : move backward' : [ 'The enemy moved backward, and you didn\'t attack it.' ],
     'demon_eye : s : fly rightward' : [ 'chance', ( ( 0, 49, 'hit' ), ( 50, 99, 'miss' ) ) ],
     'demon_eye : s : fly rightward : hit' : [ 'You jumped and hit the enemy with your sword.', ( 12, 24 ) ],
     'demon_eye : s : fly rightward : miss' : [ 'You jumped, but barely missed the enemy.' ],
@@ -214,6 +220,8 @@ class Monster:
     'demon_eye : r : fly leftward' : [ 'The enemy flew leftward, so your arrow missed.' ],
     'demon_eye : l : fly rightward' : [ 'The enemy flew rightward, so your arrow missed.' ],
     'demon_eye : l : fly leftward' : [ 'The enemy flew leftward and was hit by your arrow.', ( 8, 16 ) ],
+    'demon_eye : n : fly rightward' : [ 'The enemy flew rightward, and you didn\'t attack it.' ],
+    'demon_eye : n : fly leftward' : [ 'The enemy flew leftward, and you didn\'t attack it.', ( 8, 16 ) ],
     'cave_bat : s : hover' : [ 'The enemy didn\'t move, so you jumped and hit it with your sword.', ( 12, 24 ) ],
     'cave_bat : s : fly sideways' : [ 'You jumped towards the enemy, but it flew sideways.' ],
     'cave_bat : s : fly upward' : [ 'You jumped towards the enemy, but it flew further away.' ],
@@ -223,6 +231,9 @@ class Monster:
     'cave_bat : r : hover' : [ 'The enemy didn\'t move, so your arrow flew to its right.' ],
     'cave_bat : r : fly sideways' : [ 'The enemy flew rightward into your arrow.', ( 8, 16 ) ],
     'cave_bat : r : fly upward' : [ 'The enemy flew further away, and your arrow flew to its right.' ],
+    'cave_bat : n : hover' : [ 'The enemy didn\'t move, and you didn\'t attack it.' ],
+    'cave_bat : n : fly sideways' : [ 'The enemy flew rightward, and you didn\'t attack it.' ],
+    'cave_bat : n : fly upward' : [ 'The enemy flew further away, and you didn\'t attack it.' ],
     'skeleton : s : shield' : [ 'You swung your sword at the enemy, but it absorbed your attack.' ],
     'skeleton : s : jump' : [ 'chance', ( ( 0, 49, 'hit' ), ( 50, 99, 'miss' ) ) ],
     'skeleton : s : jump : hit' : [ 'The enemy was about to jump, but you hit it with your sword.', ( 12, 24 ) ],
@@ -245,10 +256,16 @@ class Monster:
     'skeleton : l : jump' : [ 'You shot your arrow rightward, but the enemy jumped.' ],
     'skeleton : l : move rightward' : [ 'You shot your arrow leftward, but the enemy moved rightward.' ],
     'skeleton : l : move leftward' : [ 'The enemy moved leftward into your arrow.', ( 8, 16 ) ],
+    'skeleton : n : shield' : [ 'The enemy remained stationary, and you didn\'t attack it.' ],
+    'skeleton : n : jump' : [ 'The enemy jumped, and you didn\'t attack it.' ],
+    'skeleton : n : move rightward' : [ 'The enemy moved rightward, and you didn\'t attack it.' ],
+    'skeleton : n : move leftward' : [ 'The enemy moved leftward, and you didn\'t attack it.', ( 8, 16 ) ],
     'undead_miner : s : deflect' : [ 'The enemy stayed still, so you hit it with your sword.', ( 12, 24 ) ],
     'undead_miner : s : jump' : [ 'The enemy jumped over your sword.' ],
     'undead_miner : a : deflect' : [ 'You shot at the enemy, but it blew up your arrow with a grenade.' ],
     'undead_miner : a : jump' : [ 'The enemy jumped, and you shot your arrow at it.', ( 6, 12 ) ],
+    'undead_miner : n : deflect' : [ 'The enemy stayed still, and you didn\'t attack it.' ],
+    'undead_miner : n : jump' : [ 'The enemy jumped, and you didn\'t attack it.' ],
     'harpy : g : fly upward' : [ 'The enemy flew upward and your grenade hit it.', ( 24, 48 ) ],
     'harpy : g : fly rightward' : [ 'The enemy flew right of your grenade, which fell back and hit you.', ( 24, 48 ), 'p' ],
     'harpy : g : fly leftward' : [ 'The enemy flew left of your grenade, which fell back and hit you.', ( 24, 48 ), 'p' ],
@@ -258,21 +275,24 @@ class Monster:
     'harpy : l : fly upward' : [ 'The enemy flew upward, so your arrow missed.' ],
     'harpy : l : fly rightward' : [ 'The enemy flew rightward, so your arrow missed.' ],
     'harpy : l : fly leftward' : [ 'The enemy flew leftward into your arrow.', ( 6, 12 ) ],
+    'harpy : n : fly upward' : [ 'The enemy flew upward, and you didn\'t attack it.' ],
+    'harpy : n : fly rightward' : [ 'The enemy flew rightward, and you didn\'t attack it.' ],
+    'harpy : n : fly leftward' : [ 'The enemy flew leftward, and you didn\'t attack it.' ],
     'tim : s : reflect' : [ 'You swung your sword, but the enemy reflected your attack towards you.', ( 8, 16 ), 'p' ],
-    'tim : s : charge attack' : [ 'You hit the enemy while it charged its attack.', ( 8, 16 ) ],
-    'tim : s : heal' : [ 'You hit the enemy while it healed itself.', ( 8, 16 ) ],
+    'tim : s : charge attack' : [ 'You hit the enemy while it charged its attack.', ( 8, 16 ), 'c' ],
+    'tim : s : heal' : [ 'You hit the enemy while it healed itself.', ( 8, 16 ), 'h' ],
     'tim : s : teleport' : [ 'You swung your sword at the enemy, but it teleported away from your attack.' ],
     'tim : a : reflect' : [ 'You shot an arrow at the enemy, but it reflected your attack towards you.', ( 6, 12 ), 'p' ],
-    'tim : a : charge attack' : [ 'You shot the enemy while it charged its attack.', ( 6, 12 ) ],
-    'tim : a : heal' : [ 'You shot the enemy while it healed itself.', ( 6, 12 ) ],
+    'tim : a : charge attack' : [ 'You shot the enemy while it charged its attack.', ( 6, 12 ), 'c' ],
+    'tim : a : heal' : [ 'You shot the enemy while it healed itself.', ( 6, 12 ), 'h' ],
     'tim : a : teleport' : [ 'You shot at the enemy, but it teleported away from your attack.' ],
     'tim : g : reflect' : [ 'You used a grenade, but the enemy reflected your attack towards you.', ( 24, 48 ), 'p' ],
-    'tim : g : charge attack' : [ 'You hit the enemy with a grenade while it charged its attack.', ( 24, 48 ) ],
-    'tim : g : heal' : [ 'You hit the enemy with a grenade while it healed itself.', ( 24, 48 ) ],
+    'tim : g : charge attack' : [ 'You hit the enemy with a grenade while it charged its attack.', ( 24, 48 ), 'c' ],
+    'tim : g : heal' : [ 'You hit the enemy with a grenade while it healed itself.', ( 24, 48 ), 'h' ],
     'tim : g : teleport' : [ 'You threw a grenade at the enemy, but it teleported away from your attack.' ],
     'tim : n : reflect' : [ 'The enemy attempted to reflect your attack, but you didn\'t attack it.' ],
-    'tim : n : charge attack' : [ 'The enemy charged its next attack.' ],
-    'tim : n : heal' : [ 'The enemy healed itself.' ],
+    'tim : n : charge attack' : [ 'The enemy charged its next attack.', 0, 'c' ],
+    'tim : n : heal' : [ 'The enemy healed itself.', 0, 'h' ],
     'tim : n : teleport' : [ 'The enemy teleported away from you.' ]
   }
 
@@ -302,7 +322,7 @@ class Monster:
   }
 
   # The result of each monster turn
-  # Format: [ Text + HP Lost + 'p'layer/'e'nemy ]
+  # Format: [ Text + HP Lost + Modifiers ]
   M_TURN_RESULTS = {
     'slime : b : leap' : [ 'The enemy leaped onto you, but you moved out of the way.' ],
     'slime : f : leap' : [ 'The enemy leaped onto you, but you moved out of the way.' ],
@@ -336,8 +356,7 @@ class Monster:
     'cave_bat : s : missed' : [ 'The enemy flew towards you, but it missed.' ],
     'cave_bat : s : low attack' : [ 'The enemy flew into you.', ( 10, 18 ) ],
     'cave_bat : s : high attack' : [ 'The enemy flew over you.' ],
-    'cave_bat : ! : missed' : [ 'The enemy flew towards you, but it missed.' ],
-    'cave_bat : ! : low attack' : [ 'The enemy flew into you.', ( 10, 18 ) ],
+    'cave_bat : ! : missed' : [ 'The enemy flew into you.', ( 10, 18 ) ],
     'cave_bat : ! : high attack' : [ 'The enemy flew over you.' ],
     'skeleton : j : charge' : [ 'The enemy charged toward you, and you jumped over it.' ],
     'skeleton : j : jump' : [ 'You and the enemy both jumped towards each other.', ( 18, 28 ) ],
@@ -403,7 +422,7 @@ class Monster:
     self.move_0 = self.move
     self.move_c = 0
 
-    self.charged = False # Charged used by Tim
+    self.charged = False
 
     if self.name == 'zombie':
       self.move_c = 1 if self.move == 0 else 0
@@ -412,24 +431,29 @@ class Monster:
       self.move_c = self.move
 
   # Deals damage to self, allowing a random range and multiplier to be used
-  def damage( self, a, b = 'NONE', method = '', entity = 'self' ):
+  def damage( self, a, b, method = '', entity = 'self' ):
 
     global g_hp
 
-    if b == 'NONE':
-      amount = a
-    else:
-      amount = random.randint( a, b )
+    amount = random.randint( a, b )
+    if amount == 0:
+      return 0
 
     # multiply damage based on stronger weapons/armor
     if method == 's':
-      amount *= ( 1, 1.2, 1.6, 2.0 )[ ( 'copper', 'iron', 'silver', 'gold' ).index( self.weapon_melee ) ]
+      amount *= ( 1, 1.5, 1.8, 2.2, 2.5 )[ ( 'copper', 'iron', 'silver', 'gold', 'staff' ).index( self.weapon_melee ) ]
+    if method == 's' and self.weapon_melee == 'staff' and random.randint( 0, 2 ) == 0:
+      amount *= 3
     if method == 'b':
-      amount *= ( 1, 1.2, 1.5, 1.8 )[ ( 'wood', 'iron', 'silver', 'gold' ).index( self.weapon_bow[0] ) ]
+      amount *= ( 1, 1.6, 1.9, 2.5 )[ ( 'wood', 'iron', 'silver', 'gold' ).index( self.weapon_bow[0] ) ]
     if method == 'b':
       amount *= ( 1, 2 )[ ( 'arrow', 'flame_arrow' ).index( self.weapon_bow[1] ) ]
     if entity == 'you':
-      amount *= ( 1, 0.7, 0.3, 0.05 )[ ( 'none', 'iron', 'silver', 'gold' ).index( self.armor ) ]
+      amount *= ( 1, 0.7, 0.45, 0.15 )[ ( 'none', 'iron', 'silver', 'gold' ).index( self.armor ) ]
+    if entity == 'you':
+      amount *= ( 1.5 if self.charged else 1 )
+
+    amount = int( amount )
 
     if entity == 'self':
       self.hp -= amount
@@ -449,6 +473,8 @@ class Monster:
       self.weapon_melee = 'silver'
     if update_inv( I_G_SWORD, 0, mode = 't' ) > 0:
       self.weapon_melee = 'gold'
+    if update_inv( I_MAGIC_STAFF, 0, mode = 't' ) > 0:
+      self.weapon_melee = 'staff'
 
     # Determine bow
     self.weapon_bow = [ 'none', 'none' ]
@@ -480,6 +506,7 @@ class Monster:
     self.update_stats() # Query weapon, armor, etc.
 
     options_list = []
+
     for s in ( self.PLAYER_ATTACKS[ self.name ] if player_turn else self.PLAYER_DODGES[ self.name ] ):
 
       # Throw out weapon choice if the player doesn't have the required item
@@ -493,11 +520,11 @@ class Monster:
         continue
 
       # Format print message based on keycode and items required for it
-      if should_print:
+      if should_print and s[0] != 'n':
 
         suffix = ''
         if len( s ) > 2 and s[2] == 's':
-          suffix += f"({ ( 'Copper Shortsword', 'Iron Broadsword', 'Silver Broadsword', 'Gold Broadsword' )[ ( 'copper', 'iron', 'silver', 'gold' ).index( self.weapon_melee ) ] })"
+          suffix += f"({ ( 'Copper Shortsword', 'Iron Broadsword', 'Silver Broadsword', 'Gold Broadsword', 'Magic Staff' )[ ( 'copper', 'iron', 'silver', 'gold', 'staff' ).index( self.weapon_melee ) ] })"
         if len( s ) > 2 and s[2] == 'b':
           suffix += f"({ ( 'Bow', 'Iron Bow', 'Silver Bow', 'Gold Bow' )[ ( 'wood', 'iron', 'silver', 'gold' ).index( self.weapon_bow[0] ) ] } + "
           suffix += f"{ ( 'Arrow', 'Flaming Arrow' )[ ( 'arrow', 'flame_arrow' ).index( self.weapon_bow[1] ) ] } x"
@@ -510,72 +537,70 @@ class Monster:
 
     return options_list
   
-  def player_turn( self, p ):
+  def turn( self, p, player_turn ):
 
-    self.update_stats() # Query weapon, armor, etc.
+    # Allows attacks to do the proper amount of damage
+    self.update_stats()
 
-    # Set temporary variables
-    result = self.P_TURN_RESULTS[ f'{ self.name } : { p } : { self.MONSTER_DODGES[ self.name ][ self.move ] }' ]
+    # Get result of action [text, damage, modifiers]
+    if player_turn:
+      result = self.P_TURN_RESULTS[ f'{ self.name } : { p } : { self.MONSTER_DODGES[ self.name ][ self.move ] }' ]
+    else:
+      result = self.M_TURN_RESULTS[ f'{ self.name } : { p } : { self.MONSTER_ATTACKS[ self.name ][ self.move ] }' ]
 
-    # Evaluate chance
+    # Attacks can have different outcomes by using [ chance, [ [ low_range, high_range, attack_name ], ... ] ]
+    # This code evaulates that chance, and chooses an actual result based on it
     if result[0] == 'chance':
       temp_rand = random.randint( 0, 99 )
       for i in result[1]:
         if ( i[0] <= temp_rand <= i[1] ):
-          result = self.P_TURN_RESULTS[ f'{ self.name } : { p } : { self.MONSTER_DODGES[ self.name ][ self.move ] } : { i[2] }' ]
+          if player_turn:
+            result = self.P_TURN_RESULTS[ f'{ self.name } : { p } : { self.MONSTER_DODGES[ self.name ][ self.move ] } : { i[2] }' ]
+          else:
+            result = self.M_TURN_RESULTS[ f'{ self.name } : { p } : { self.MONSTER_ATTACKS[ self.name ][ self.move ] } : { i[2] }' ]
           break
       else:
         print( "ERROR: Random values don't add up to 100." )
 
+    # Fill in default values for the result
     if len( result ) == 1: result.append( 0 )
-    if len( result ) == 2: result.append( 'e' )
+    if isinstance( result[1], int ):
+      result[1] = ( result[1], result[1] )
+    if len( result ) == 2: result.append( 'e' if player_turn else 'p' )
 
-    # Get method
-    for i in self.PLAYER_ATTACKS:
-      print( i[0], p )
-    dmg_method = [ i for i in self.PLAYER_ATTACKS[ self.name ] if i[0] == p ][0]
+    # Damage method determines what gear the player used, and therefore, how much damage the entity should take
+    if player_turn:
+      dmg_method = [ i for i in self.PLAYER_ATTACKS[ self.name ] if i[0] == p ][0]
+    elif p != '!':
+      dmg_method = [ i for i in self.PLAYER_DODGES[ self.name ] if i[0] == p ][0]
+    else:
+      dmg_method = []
     dmg_method = ( '' if len( dmg_method ) < 3 else dmg_method[2] )
 
-    # Display text/subtract HP
+    # Subtract HP
+    dmg_amount = self.damage( *result[1], entity = 'self' if 'e' in result[2] else 'you', method = dmg_method )
+
+    # Remove items
+    if dmg_method == 'b':
+      update_inv( I_ARROW if self.weapon_bow[1] == 'arrow' else I_F_ARROW, 1, 'r' )
+    elif dmg_method == 'g':
+      update_inv( I_GRENADE, 1, 'r' )
+
+    # Display text
     print( '[!] ' + result[0] )
-    print( '[*] ' + ( 'Enemy' if result[2] == 'e' else 'You' ) + ': ', end = '' )
-    print( '-' + str( self.damage( *result[1], entity = 'self' if result[2] == 'e' else 'you', method = dmg_method ) ), end = '' )
-    print( ' HP' if result[1] != 0 else 'NO DAMAGE' )
+    if dmg_amount == 0:
+      print( f"[*] { 'Enemy' if result[2] == 'e' else 'You' }: NO DAMAGE"  )
+    elif dmg_amount != 0:
+      print( f"[*] { 'Enemy' if result[2] == 'e' else 'You' }: -{ dmg_amount } HP"  )
 
-    # Charge/heal (Tim exclusive)
-    if ( self.MONSTER_DODGES[ self.name ][ self.move ] == 'heal' ): print( f'[*] Enemy: +{ -self.damage( -10, -1 ) } HP' )
-    self.charged = ( self.MONSTER_DODGES[ self.name ][ self.move ] == 'charge attack' )
-    if self.charged: print( '[*] Enemy: +50% DMG next turn' )
+    # Change HP/Display text for special moves
+    self.charged = ( 'c' in result[2] )
+    if self.charged:
+      print( '[*] Enemy: +50% DMG next turn' )
+    if 'h' in result[2]:
+      print( f'[*] Enemy: +{ -self.damage( -10, -1 ) } HP' )
 
-    # Check if fight is over
-    self.hp_check()
-
-    # Advance move
-    self.advance_move()
-  
-  def monster_turn( self, p ):
-
-    self.update_stats() # Query weapon, armor, etc.
-
-    # Set temporary variables
-    result = self.M_TURN_RESULTS[ f'{ self.name } : { p } : { self.MONSTER_ATTACKS[ self.name ][ self.move ] }' ]
-
-    # Evaluate chance
-    if result[0] == 'chance':
-      temp_rand = random.randint( 0, 99 )
-      for i in result[1]:
-        if ( i[0] <= temp_rand <= i[1] ):
-          result = self.M_TURN_RESULTS[ f'{ self.name } : { p } : { self.MONSTER_ATTACKS[ self.name ][ self.move ] } : { i[2] }' ]
-          break
-      else:
-        print( "ERROR: Random values don't add up to 100." )
-
-    if len( result ) == 1: result.append( 0 )
-    if isinstance( result[1], int ): result[1] = ( result[1] )
-    if len( result ) == 2: result.append( 'p' )
-
-    print( '[!] ' + result[0] )
-    print( '[*] ' + ( 'Enemy' if result[2] == 'e' else 'You' ) + ': ' + ( '-' + str( self.damage( *result[1], entity = 'self' if result[2] == 'e' else 'you', method = '' ) ) + ' HP' if result[1] != 0 else 'NO DAMAGE' ) )
+    # Remove item
 
     # Check if fight is over
     self.hp_check()
@@ -589,6 +614,7 @@ class Monster:
     if self.hp <= 0:
       print_line()
       print( f"[!] { self.name.replace( '_', ' ' ).title() } was killed." )
+      self.give_items()
       input( '[!] Press enter to exit the fight. ' )
       goto_room( room_scene )
 
@@ -597,6 +623,11 @@ class Monster:
       print( f"[!] { self.name.replace( '_', ' ' ).title() } won." )
       input( '[!] Press enter to exit the fight. ' )
       goto_room( room_death )
+
+  def give_items( self ):
+
+    if self.name == 'slime':
+      pass
 
   def advance_move( self ):
 
@@ -634,7 +665,22 @@ class Monster:
       self.move = ( self.move + 1 + ( 1 if self.move_c % ( 2 * ( self.move_0 + 1 ) ) == 0 else 0 ) ) % 4
 
 # Eye of Cthulhu
-class EyeOfCthulhu:
+class EyeOfCthulhu( Monster ):
+
+  # The player's options for each player turn
+  # Format: [ Letter ID, Action Name, Requirements, Req. Angle ]
+  PLAYER_ATTACKS = [ [ 's', 'Swing sword (*)', 's', 1 ], [ 'r', 'Shoot rightward', 'b', 0 ], [ 'l', 'Shoot leftward', 'b', 2 ],
+  [ 'd', 'Shoot downward', 'b', 3 ], [ 'x', 'Throw grenade rightward', 'g', 0 ], [ 'y', 'Throw grenade leftward', 'g', 2 ],
+  [ 'z', 'Throw grenade downward', 'g', 3 ] ]
+
+  # The player's options for each monster turn
+  # Format: [ Letter ID, Action Name, Requirements ]
+  PLAYER_DODGES = [ [ 'j', 'Jump', '', 1 ], [ 'f', 'Fall', '', 1 ], [ 'r', 'Dodge rightward', '', 0 ], [ 'l', 'Dodge leftward', '', 0 ], [ 'g', 'Counter with grenade', 'g', -1 ] ]
+
+  # Determines the damage each weapon does
+  # (Can't have it defined for each possible outcome like in the base class b/c
+  # there's too many possible outcomes, so it's only defined for each weapon type)
+  DAMAGE_RANGES = { 's': ( 8, 16 ), 'b': ( 6, 12 ), 'g': ( 24, 48 ) }
 
   def __init__( self ):
 
@@ -642,91 +688,160 @@ class EyeOfCthulhu:
 
     self.move = [ random.randint( 0, 3 ), random.choice( list( 'abc' ) ) ]
     self.move_0 = self.move
+    self.move_c = 0
 
-  # Deals damage to self, allowing a random range and multiplier to be used
-  def damage( self, a, b = 'NONE', m = 1, entity = 'self' ):
+    self.angle = random.randint( 0, 3 )
 
-    global g_hp
-
-    if b == 'NONE':
-      amount = a
-    else:
-      amount = random.randint( a, b )
-
-    # m (multiplier) is used for stronger weapons/armor
-    amount *= m
-    if entity == 'self':
-      self.hp -= amount
-    else:
-      g_hp -= amount
-    return amount
+    self.charged = False
 
   def get_options( self, player_turn, should_print = True ):
 
+    self.update_stats() # Query weapon, armor, etc.
+
     options_list = []
-    for s in ( self.PLAYER_ATTACKS[ self.name ] if player_turn else self.PLAYER_DODGES[ self.name ] ):
+    for s in ( self.PLAYER_ATTACKS if player_turn else self.PLAYER_DODGES ):
+
+      # Throw out weapon choice if the player doesn't have the required item
+      if len( s ) > 2 and s[2] == 's' and self.weapon_melee == 'none':
+        continue
+      if len( s ) > 2 and s[2] == 'b' and self.weapon_bow[0] == 'none':
+        continue
+      if len( s ) > 2 and s[2] == 'b' and self.weapon_bow[1] == 'none':
+        continue
+      if len( s ) > 2 and s[2] == 'g' and self.weapon_grenade == 'none':
+        continue
+
+      # Format print message based on keycode and items required for it
       if should_print:
-        print( f'[{ s[0].upper() }] { s[1] }' )
+
+        suffix = ''
+        if len( s ) > 2 and s[2] == 's':
+          suffix += f"({ ( 'Copper Shortsword', 'Iron Broadsword', 'Silver Broadsword', 'Gold Broadsword', 'Magic Staff' )[ ( 'copper', 'iron', 'silver', 'gold', 'staff' ).index( self.weapon_melee ) ] })"
+        if len( s ) > 2 and s[2] == 'b':
+          suffix += f"({ ( 'Bow', 'Iron Bow', 'Silver Bow', 'Gold Bow' )[ ( 'wood', 'iron', 'silver', 'gold' ).index( self.weapon_bow[0] ) ] } + "
+          suffix += f"{ ( 'Arrow', 'Flaming Arrow' )[ ( 'arrow', 'flame_arrow' ).index( self.weapon_bow[1] ) ] } x"
+          suffix += f"{ update_inv( ( I_ARROW, I_F_ARROW )[ ( 'arrow', 'flame_arrow' ).index( self.weapon_bow[1] ) ], 0, mode = 't' ) })"
+        if len( s ) > 2 and s[2] == 'g':
+          suffix += f"(Grenade x{ update_inv( I_GRENADE, 0, mode = 't' ) })"
+
+        print( f'[{ s[0].upper() }] { s[1] } { suffix }' )
       options_list.append( s[0].lower() )
 
     return options_list
   
-  def player_turn( self, p ):
+  def turn( self, p, player_turn ):
 
-    # Set temporary variables
-    result = self.P_TURN_RESULTS[ f'{ self.name } : { p } : { self.MONSTER_DODGES[ self.name ][ self.move ] }' ]
+    # Loop through each attack
+    for i in range( 3 ):
 
-    # Evaluate chance
-    if result[0] == 'chance':
-      temp_rand = random.randint( 0, 99 )
-      for i in result[1]:
-        if ( i[0] <= temp_rand <= i[1] ):
-          result = self.P_TURN_RESULTS[ f'{ self.name } : { p } : { self.MONSTER_DODGES[ self.name ][ self.move ] } : { i[2] }' ]
-          break
+      # Allows attacks to do the proper amount of damage
+      self.update_stats()
+
+      # Update they eye's position
+      if player_turn:
+
+        # Stays stationary on the first turn
+
+        # Moves based on number in the second turn
+        if i == 1:
+          self.angle = ( self.angle + self.move[0] ) % 4
+
+        # Moves based on letter in the third turn
+        if i == 2:
+          self.angle = ( self.angle + 1 + list( 'abc' ).index( self.move[1] ) ) % 4
+
       else:
-        print( "ERROR: Random values don't add up to 100." )
 
-    if len( result ) == 1: result.append( 0 )
-    if len( result ) == 2: result.append( 'e' )
+        # Servant turn based off of letter
+        if i == list( 'abc' ).index( self.move[1] ):
+          self.angle = -1
 
-    # Display text/subtract HP
-    print( '[!] ' + result[0] )
-    print( '[*] ' + ( 'Enemy' if result[2] == 'e' else 'You' ) + ': ' + ( '-' + str( self.damage( *result[1], entity = 'self' if result[2] == 'e' else 'you' ) ) + ' HP' if result[1] != 0 else 'NO DAMAGE' ) )
+        # Perform number-based charge
+        elif i == 0 or ( i == 1 and self.move[1] == 'a' ):
+          self.angle = ( self.angle + self.move[0] ) % 4
 
-    # Charge/heal (Tim exclusive)
-    if ( self.MONSTER_DODGES[ self.name ][ self.move ] == 'heal' ): print( f'[*] Enemy: +{ -self.damage( -10, -1 ) } HP' )
-    self.charged = ( self.MONSTER_DODGES[ self.name ][ self.move ] == 'charge attack' )
-    if self.charged: print( '[*] Enemy: +50% DMG next turn' )
+        # Perform letter-based charge
+        elif i == 2 or ( i == 1 and self.move[1] == 'c' ):
+          self.angle = ( self.angle + list( 'abc' ).index( self.move[1] ) ) % 4
 
-    # Check if fight is over
-    self.hp_check()
-
-    # Advance move
-    self.advance_move()
-  
-  def monster_turn( self, p ):
-
-    # Set temporary variables
-    result = self.M_TURN_RESULTS[ f'{ self.name } : { p } : { self.MONSTER_ATTACKS[ self.name ][ self.move ] }' ]
-
-    # Evaluate chance
-    if result[0] == 'chance':
-      temp_rand = random.randint( 0, 99 )
-      for i in result[1]:
-        if ( i[0] <= temp_rand <= i[1] ):
-          result = self.M_TURN_RESULTS[ f'{ self.name } : { p } : { self.MONSTER_ATTACKS[ self.name ][ self.move ] } : { i[2] }' ]
-          break
+      # Damage method determines what gear the player used, and therefore, how much damage the entity should take
+      if player_turn:
+        dmg_method = [ j for j in self.PLAYER_ATTACKS if j[0] == p[i] ][0]
       else:
-        print( "ERROR: Random values don't add up to 100." )
+        dmg_method = [ j for j in self.PLAYER_DODGES if j[0] == p[i] ][0]
+      dmg_method = ( '' if len( dmg_method ) < 3 else dmg_method[2] )
 
-    if len( result ) == 1: result.append( 0 )
-    if len( result ) == 2: result.append( 'p' )
+      # Remove items
+      if dmg_method == 'b':
+        update_inv( I_ARROW if self.weapon_bow[1] == 'arrow' else I_F_ARROW, 1, 'r' )
+      elif dmg_method == 'g':
+        update_inv( I_GRENADE, 1, 'r' )
 
-    print( '[!] ' + result[0] )
-    print( '[*] ' + ( 'Enemy' if result[2] == 'e' else 'You' ) + ': ' + ( '-' + str( self.damage( *result[1], entity = 'self' if result[2] == 'e' else 'you' ) ) + ' HP' if result[1] != 0 else 'NO DAMAGE' ) )
+      # Make sure player has their requred item
+      has_item = True
+      if dmg_method == 's' and self.weapon_melee == 'none':
+        has_item = False
+      if dmg_method == 'b' and 'none' in self.weapon_bow:
+        has_item = False
+      if dmg_method == 'g' and self.weapon_grenade == 'none':
+        has_item = False
 
-    # Check if fight is over
-    self.hp_check()
+      # Get result of action [text, damage, modifiers]
+      if player_turn:
+
+        dmg_amount = 0
+        
+        temp_dir = ( 'to the right', 'upward', 'to the left', 'downward' )[ self.angle ]
+        attack_angle = [ j for j in self.PLAYER_ATTACKS if j[0] == p[i] ][0][3]
+        if attack_angle == self.angle and has_item:
+          if p[i] == 's' and random.choice( ( True, False ) ):
+            print( f'[!] The enemy flew { temp_dir }, and you barely missed it.' )
+          else:
+            print( f'[!] The enemy flew { temp_dir }, and you hit it.' )
+            dmg_amount = self.damage( *self.DAMAGE_RANGES[ dmg_method ], entity = 'self', method = dmg_method )
+        elif has_item:
+          print( f'[!] The enemy flew { temp_dir }, so your attack missed.' )
+        else:
+          print( f'[!] You ran out of the weapon necessary to perform this attack.' )
+
+      else:
+        
+        dmg_amount = 0
+
+        temp_dir = ( '', 'leftward', 'downward', 'rightward', 'upward' )[ self.angle + 1 ]
+        temp_move = ( '', 'jumping', 'falling downward', 'moving rightward', 'moving leftward' )[ list( 'gjfrl' ).index( p[i] ) ]
+        dodge_angle = [ j for j in self.PLAYER_DODGES if j[0] == p[i] ][0][3]
+
+        if self.angle != -1 and dodge_angle != -1 and self.angle % 2 != dodge_angle:
+          print( f'The enemy charged { temp_dir }, and you dodged it by { temp_move }.' )
+        elif self.angle != -1 and dodge_angle != -1:
+          print( f'The enemy charged { temp_dir } and hit you.' )
+          dmg_amount = self.damage( 40, 100, entity = 'you', method = dmg_method )
+        elif self.angle != -1 and dodge_angle == -1:
+          print( f'The enemy charged { temp_dir }, and your grenade didn\'t counter its attack.' )
+          dmg_amount = self.damage( 40, 100, entity = 'you', method = dmg_method )
+        elif self.angle == -1 and dodge_angle != -1:
+          print( f'The enemy sent two Servants of Cthulhu after you, and you only dodged one of them.' )
+          dmg_amount = self.damage( 30, 50, entity = 'you', method = dmg_method )
+        elif self.angle == -1 and dodge_angle == -1:
+          print( f'The enemy sent two Servants of Cthulhu after you, and your grenade killed both of them.' )
+
+        if self.angle == -1:
+          self.angle = 1
+        else:
+          self.angle = ( self.angle + 2 ) % 4
+
+      # Display text
+      if dmg_amount == 0:
+        print( f"[*] { 'Boss' if player_turn else 'You' }: NO DAMAGE"  )
+      elif dmg_amount != 0:
+        print( f"[*] { 'Boss' if player_turn else 'You' }: -{ dmg_amount } HP"  )
+
+      # Check if fight is over
+      self.hp_check()
+
+      # Wait
+      time.sleep( 0.5 )
 
     # Advance move
     self.advance_move()
@@ -736,19 +851,21 @@ class EyeOfCthulhu:
 
     if self.hp <= 0:
       print_line()
-      print( f"[!] { self.name.replace( '_', ' ' ).title() } was killed." )
+      print( f"[!] Eye of Cthulhu was killed." )
       input( '[!] Press enter to exit the fight. ' )
       goto_room( room_scene )
 
     if g_hp <= 0:
       print_line()
-      print( f"[!] { self.name.replace( '_', ' ' ).title() } won." )
+      print( f"[!] Eye of Cthulhu won." )
       input( '[!] Press enter to exit the fight. ' )
       goto_room( room_death )
 
   def advance_move( self ):
 
-    pass
+    self.move_c += 1
+    self.move[0] = ( self.move[0] + ( 2 if self.move_c % 2 else 3 ) ) % 4
+    self.move[1] = list( 'bca' )[ list( 'abc' ).index( self.move[1] ) ]
 
 # Switches rooms
 def goto_room( room, arg = '' ):
@@ -1155,6 +1272,20 @@ def start_fight( monster_id ):
   
   goto_room( room_fight )
 
+def start_bossfight():
+
+  global g_monster
+  g_monster = EyeOfCthulhu()
+
+  print_line()
+  for c in 'Eye of Cthulhu has awoken!':
+    print( c, end = '', flush = True )
+    time.sleep( 0.08 )
+  time.sleep( 2 )
+  print()
+
+  goto_room( room_bossfight )
+
 # ITEM CONSTANTS
 I_NULL = 0
 I_C_SSWORD = 1
@@ -1193,45 +1324,49 @@ I_HARPY_WINGS = 33
 I_I_ARMOR = 34
 I_S_ARMOR = 35
 I_G_ARMOR = 36
+I_GEL = 37
+I_FEATHER = 38
 
 ITEM_META = [
   [ 'NULL', 'An item you shouldn\'t have' ],
-  [ 'Copper Shortsword', 'Better than nothing!' ],
-  [ 'Copper Pickaxe', 'The best pick in the game.\n(Also the only pick in the game).' ],
-  [ 'Grass', 'Not useful for much, but you\'ll acquire it anyway.' ],
-  [ 'Stone', 'The most prevalent material in the world.' ],
-  [ 'Wood', 'A reliable building block.' ],
-  [ 'Iron Ore', 'An ore.' ],
-  [ 'Silver Ore', 'An ore.' ],
-  [ 'Gold Ore', 'An ore.' ],
-  [ 'Iron Bar', 'A bar.' ],
-  [ 'Silver Bar', 'A bar.' ],
-  [ 'Gold Bar', 'A bar.' ],
-  [ 'Wooden Sword', 'Description' ],
-  [ 'Iron Sword', 'Description' ],
-  [ 'Silver Sword', 'Description' ],
-  [ 'Golden Sword', 'Description' ],
-  [ 'Wooden Bow', 'Description' ],
-  [ 'Iron Bow', 'Description' ],
-  [ 'Silver Bow', 'Description' ],
-  [ 'Golden Bow', 'Description' ],
-  [ 'Torch', 'Description' ],
-  [ 'Arrow', 'Description' ],
-  [ 'Flaming Arrow', 'Description' ],
-  [ 'Wooden Platform', 'Description' ],
-  [ 'Chest', 'Description' ],
-  [ 'Sus Eye', 'Description' ],
-  [ 'Grenade', 'Description' ],
-  [ 'Healing Potion', 'Usable anytime.\nGrants +100 HP.' ],
-  [ 'Life Crystal', 'Increases MHP by 20 HP.' ],
-  [ 'Magic Staff', 'Description' ],
+  [ 'Copper Shortsword', 'Better than nothing! ## Medn damage: 12' ],
+  [ 'Copper Pickaxe', 'The best pick in the game ## (Also the only pick in the game)' ],
+  [ 'Grass', 'Not useful for much, but you\'ll acquire it anyway ## Placeable' ],
+  [ 'Stone', 'The most prevalent material in the world ## Placeable ## Material' ],
+  [ 'Wood', 'A reliable building block/material ## Placeable ## Material' ],
+  [ 'Iron Ore', 'A relatively weak ore ## Material' ],
+  [ 'Silver Ore', 'A slightly more powerful ore ## Material' ],
+  [ 'Gold Ore', 'A relatively strong ore ## Material' ],
+  [ 'Iron Bar', 'A relatively weak bar ## Material' ],
+  [ 'Silver Bar', 'A slightly more powerful bar ## Material' ],
+  [ 'Gold Bar', 'A relatively strong bar ## Material' ],
+  [ 'Wooden Sword', 'Unobtainable because I forgot I was supposed to make them' ],
+  [ 'Iron Sword', 'Not that strong ## Mean damage: 18' ],
+  [ 'Silver Sword', 'Decently strong ## Mean damage: 22' ],
+  [ 'Golden Sword', 'Pretty strong ## Mean damage: 26' ],
+  [ 'Wooden Bow', 'Pretty weak ## Mean damage: 9' ],
+  [ 'Iron Bow', 'Not that strong ## Mean damage: 14' ],
+  [ 'Silver Bow', 'Decently strong ## Mean damage: 17' ],
+  [ 'Golden Bow', 'Pretty strong ## Mean damage: 22' ],
+  [ 'Torch', 'bright. ## Material' ],
+  [ 'Arrow', 'Used as ammo for bows ## Material' ],
+  [ 'Flaming Arrow', 'Used as ammo for bows ## Damage multiplier: 2' ],
+  [ 'Wooden Platform', 'Can be stood on or passed through' ],
+  [ 'Chest', 'Holds items ## (Also took a long time to program)' ],
+  [ 'Sus Eye', 'You should use it; it\'d make for a cool party trick ## What could go wrong?' ],
+  [ 'Grenade', 'Explodes on contact, dealing a lot of damage ## Mean damage: 36' ],
+  [ 'Healing Potion', 'Usable anytime ## Grants 100 HP' ],
+  [ 'Life Crystal', 'Increases MHP by 20 HP' ],
+  [ 'Magic Staff', 'Extremely strong ## Mean damage: 30 ## Damage multiplier: 3 (33% chance)' ],
   [ 'Trophy', 'That\'s it. That\'s all you get.' ],
   [ 'Mega Crytstal', 'Description' ],
-  [ 'Shackle', 'Description' ],
-  [ 'Harpy Wings', 'More Jumping' ],
-  [ 'Iron Armor', 'More Jumping' ],
-  [ 'Silver Armor', 'More Jumping' ],
-  [ 'Gold Armor', 'More Jumping' ]
+  [ 'Shackle', 'Drastically increases your chance of fleeing from a battle.' ],
+  [ 'Harpy Wings', 'Infinite upward mobility ## (Equipped automatically)' ],
+  [ 'Iron Armor', 'Not that strong ## 30% damage absorption ## (Equipped automatically)' ],
+  [ 'Silver Armor', 'Decently strong ## 55% damage absorption ## (Equipped automatically)' ],
+  [ 'Gold Armor', 'Pretty strong ## 85 % damage absorption ## (Equipped automatically)' ],
+  [ 'Gel', 'Can be crafted into torches ## Material' ],
+  [ 'Feather', 'You might be able to fly if you get enough of them ## Material' ]
 ]
 
 # GLOBAL CONSTANTS
@@ -1247,6 +1382,7 @@ g_data = {}
 g_cname = ''
 g_wname = ''
 g_pos = V2( 0, 0 )
+g_spawn = V2( 0, 0 )
 g_view = V2( 0, 0 )
 g_world_size = V2( 0, 0 )
 g_tile_data = []
@@ -1683,6 +1819,7 @@ def generate_world( size, seed ):
 
   # Lastly, position the player
   g_pos = V2( size.x // 2, int( ( size.y / 2 ) + noise_top( size.x // 2, seed ) ) - 1 )
+  g_spawn = V2( size.x // 2, int( ( size.y / 2 ) + noise_top( size.x // 2, seed ) ) - 1 )
   g_tile_data[ xy2c( g_pos.x, g_pos.y + 1, size.x ) ] = 'g' # Make sure the player is standing on a block
 
   # Set progress to 100 (in case something glitched)
@@ -1701,6 +1838,7 @@ def data_world_init( name, seed ):
   file.write( 'version: 1.0\n')
   file.write( f'size: { size.x },{ size.y }\n')
   file.write( f'seed: { seed }\n')
+  file.write( f'player_pos: { g_pos.x },{ g_pos.y }\n' )
   file.write( f'player_pos: { g_pos.x },{ g_pos.y }\n' )
 
   # Write tile data
@@ -1722,7 +1860,7 @@ def data_world_init( name, seed ):
 # Load a world file with a given name
 def data_world_load( name ):
 
-  global g_pos, g_world_size, g_seed, g_tile_data, g_tile_special, g_show_help, g_slot, g_versions, g_play_time_last, g_enemy_timer
+  global g_pos, g_spawn, g_world_size, g_seed, g_tile_data, g_tile_special, g_show_help, g_slot, g_versions, g_play_time_last, g_enemy_timer
 
   # Split file into statements
   file = open( 'w_' + name + '.txt', 'r' ).read().split( '\n' )
@@ -1734,16 +1872,17 @@ def data_world_load( name ):
   g_world_size = V2( int( file[1][6:].split( ',' )[0] ), int( file[1][6:].split( ',' )[1] ) )
   g_seed = int( file[2][6:] )
   g_pos = V2( int( file[3][12:].split( ',' )[0] ), int( file[3][12:].split( ',' )[1] ) )
+  g_spawn = V2( int( file[4][12:].split( ',' )[0] ), int( file[4][12:].split( ',' )[1] ) )
 
   # Read tile data
   g_tile_data = "";
   for j in range( g_world_size.y ):
-    g_tile_data += file[4 + j]
+    g_tile_data += file[5 + j]
   g_tile_data = list( g_tile_data )
 
   # Read special tile data
   g_tile_special = {}
-  for line in file[ 4 + g_world_size.y:len( file ) ]:
+  for line in file[ 5 + g_world_size.y:len( file ) ]:
 
     # Exit if not data
     if not ( len( line ) > 0 and line[0] == 'S' ): continue
@@ -1783,6 +1922,7 @@ def data_world_update( name ):
   file.write( f'size: { g_world_size.x },{ g_world_size.y }\n')
   file.write( f'seed: { g_seed }\n')
   file.write( f'player_pos: { g_pos.x },{ g_pos.y }\n' )
+  file.write( f'spawnpoint: { g_spawn.x },{ g_spawn.y }\n' )
 
   # Write tile data
   for j in range( g_world_size.y ):
@@ -1829,6 +1969,7 @@ def room_menu():
                                                                                     (v1.0)
 
 [P] Play
+[S] Settings
 [Q] Quit''')
 
   # Reset important stuff
@@ -2350,11 +2491,11 @@ def room_scene( arg = '' ):
       if jump_height != 'ERROR':
 
         # Check range
-        if not ( 0 < jump_height <= 5 ):
+        if not ( 0 < jump_height <= ( 20 if update_inv( I_HARPY_WINGS, 0, mode = 't' ) > 0 else 5 ) ):
           print( '[#] Jump height out of range.' )
 
-        # If not on block and not on floor, run game tick and reload stage
-        elif g_pos.y + 1 < g_world_size.y and get_tile( g_pos.x, g_pos.y + 1 ) in AIR_BLOCKS:
+        # If not on block and not on floor (unless they have wings), run game tick and reload stage
+        elif g_pos.y + 1 < g_world_size.y and get_tile( g_pos.x, g_pos.y + 1 ) in AIR_BLOCKS and update_inv( I_HARPY_WINGS, 0, mode = 't' ) == 0:
           tick()
           goto_room( room_scene )
 
@@ -2424,7 +2565,7 @@ def room_scene( arg = '' ):
 
         if g_items[ g_slot ][ 0 ] == I_SUS_EYE:
           update_inv( I_SUS_EYE, 1, 'r' )
-          # Encounter eye of Cthulhu here
+          start_bossfight()
 
         elif g_items[ g_slot ][ 0 ] == I_HEALTH_POTION:
           update_inv( I_HEALTH_POTION, 1, 'r' )
@@ -2437,6 +2578,7 @@ def room_scene( arg = '' ):
             update_inv( I_CRYSTAL, 1, 'r' )
             print( '[!] You used a life crystal. (+20 MHP)' )
             g_hp_max += 20
+            g_hp += 20
             goto_room( room_scene )
           else:
             print( '[#] Your health is already maxed.' )
@@ -2560,18 +2702,26 @@ def room_scene( arg = '' ):
 
         # Attempt casting info
         try:
-          item_info = ( int( p[7:].split( ' ' )[0] ), int( p[7:].split( ' ' )[1] ) )
+          item_info = [ p[7:].split( ' ' )[0], int( p[7:].split( ' ' )[1] ) ]
         except Exception:
-          print( '[#] Enter 2 numbers.' )
+          print( '[#] Enter an item ID followed by a number.' )
         else:
 
           # Give/remove and print info
-          if p[2] == 'g':
-            update_inv( *item_info )
-            print( f'[!] Gave you "{ item_meta( item_info[0] ) }" x{ item_info[1] }' )
-          else:
-            print( f"[!] Removed \"{ item_meta( item_info[0] ) }\" x{ update_inv( *item_info, mode = 'r' ) }" )
-          goto_room( room_scene )
+          try:
+
+            # Filter input
+            item_info[0] = 'I_' + ''.join( [ j.upper() for j in item_info[0] if j not in ( ')', '(', ' ', '.' ) ] )[ :20 ]
+
+            if p[2] == 'g':
+              exec( 'update_inv( ' + item_info[0] + ', item_info[1] )' )
+              exec( 'print( f\'[!] Gave you "{ item_meta( ' + item_info[0] + ' ) }" x{ item_info[1] }\' )' )
+            else:
+              exec( 'amount_removed = update_inv( ' + item_info[0] + ', item_info[1], mode = \'r\' )' )
+              exec( 'print( f\'[!] Removed "{ item_meta( ' + item_info[0] + ' ) }" x{ amount_removed }\' )' )
+            goto_room( room_scene )
+          except Exception:
+            print( '[#] Invalid item ID.' )
 
       # Set block
       elif p[2:] == 'set':
@@ -2710,7 +2860,9 @@ def room_inventory( arg = "" ):
         # Print item info and re-show inventory
         else:
           print( "[?] Item: " + item_meta( list( '1234567890ABCDEF' ).index( p ), 0, c = 1 ) )
-          print( "[?] Description: " + item_meta( list( '1234567890ABCDEF' ).index( p ), 1, c = 1 ) )
+          print( "[?] Description:" )
+          for l in item_meta( list( '1234567890ABCDEF' ).index( p ), 1, c = 1 ).split( ' ## ' ):
+            print( '- ' + l )
           goto_room( room_inventory, '1' )
 
     # Move
@@ -2755,7 +2907,7 @@ def room_inventory( arg = "" ):
           # Swap, print message, and re-show inventory
           update_inv( *g_items[p], mode = 's', slot = old_p )
           update_inv( *swap_buffer, mode = 's', slot = p )
-          print( f'[!] Moved "{ item_meta( p, c = 1 ) }".' if g_items[t][1] == 0 else f'[!] Swapped "{ item_meta( p, c = 1 ) }" and "{ item_meta( old_p, c = 1 ) }"' )
+          print( f'[!] Moved "{ item_meta( p, c = 1 ) }".' if g_items[old_p][1] == 0 else f'[!] Swapped "{ item_meta( p, c = 1 ) }" and "{ item_meta( old_p, c = 1 ) }"' )
           goto_room( room_inventory )
 
     # Trash
@@ -2812,17 +2964,25 @@ def room_crafting( arg = '' ):
 
   # Store recipes object
   RECIPES = [
+    { 'req': { I_WOOD: 1, I_GEL: 1 }, 'res': [ I_TORCH, 3 ] },
+    { 'req': { I_WOOD: 1, I_STONE: 1 }, 'res': [ I_ARROW, 5 ] },
+    { 'req': { I_ARROW: 5, I_TORCH: 1 }, 'res': [ I_F_ARROW, 5 ] },
+    { 'req': { I_WOOD: 5 }, 'res': [ I_PLATFORM, 2 ] },
+    { 'req': { I_WOOD: 12, I_IRON_BAR: 2 }, 'res': [ I_CHEST, 1 ] },
+    { 'req': { I_FEATHER: 24 }, 'res': [ I_HARPY_WINGS, 1 ] },
     { 'req': { I_IRON_ORE: 3 }, 'res': [ I_IRON_BAR, 1 ] },
     { 'req': { I_SILVER_ORE: 3 }, 'res': [ I_SILVER_BAR, 1 ] },
     { 'req': { I_GOLD_ORE: 3 }, 'res': [ I_GOLD_BAR, 1 ] },
-    { 'req': { I_WOOD: 20 }, 'res': [ I_W_SWORD, 1 ] },
     { 'req': { I_WOOD: 8, I_IRON_BAR: 8 }, 'res': [ I_I_SWORD, 1 ] },
     { 'req': { I_WOOD: 8, I_SILVER_BAR: 8 }, 'res': [ I_S_SWORD, 1 ] },
     { 'req': { I_WOOD: 8, I_GOLD_BAR: 8 }, 'res': [ I_G_SWORD, 1 ] },
     { 'req': { I_WOOD: 12 }, 'res': [ I_W_BOW, 1 ] },
     { 'req': { I_IRON_BAR: 6 }, 'res': [ I_I_BOW, 1 ] },
     { 'req': { I_SILVER_BAR: 6 }, 'res': [ I_S_BOW, 1 ] },
-    { 'req': { I_GOLD_BAR: 6 }, 'res': [ I_G_BOW, 1 ] }
+    { 'req': { I_GOLD_BAR: 30 }, 'res': [ I_G_BOW, 1 ] },
+    { 'req': { I_IRON_BAR: 30 }, 'res': [ I_I_ARMOR, 1 ] },
+    { 'req': { I_SILVER_BAR: 30 }, 'res': [ I_S_ARMOR, 1 ] },
+    { 'req': { I_GOLD_BAR: 30 }, 'res': [ I_G_ARMOR, 1 ] }
   ]
 
   # Try extracting page from argument
@@ -3118,41 +3278,51 @@ def room_chest( arg = '' ):
     else:
       print( '[#] Unknown command.' )
 
-def room_fight():
+def room_fight( arg = '' ):
 
   global g_monster, g_hp
 
   # PLAYER TURN
-  print_line()
-  print( f'You: { g_hp } HP' )
-  print( f"{ g_monster.name.replace( '_', ' ' ).title() }: { g_monster.hp } HP" )
-  allowed_inputs = g_monster.get_options( player_turn = True )
-  print( '[*] Pause' )
+  if not ( len( arg ) > 0 and arg[0] == '1' ):
+    print_line()
+    print( f'You: { g_hp } HP' )
+    print( f"{ g_monster.name.replace( '_', ' ' ).title() }: { g_monster.hp } HP" )
+    allowed_inputs = g_monster.get_options( player_turn = True )
+    if update_inv( I_HEALTH_POTION, 0, 't' ) >= 1:
+      print( '[H] Drink health potion' )
+    print( '[N] Do nothing' )
+    print( '[*] Pause' )
 
-  # Get inputs
-  while True:
-    p = input( '> ' ).lower()
+    # Get inputs
+    while True:
+      p = input( '> ' ).lower()
 
-    # Pause
-    if p == '*':
-      goto_room( room_pause, 'goto_room( room_fight )' )
+      # Pause
+      if p == '*':
+        goto_room( room_pause, 'goto_room( room_fight )' )
 
-    # Turn
-    elif p in allowed_inputs:
-      g_monster.player_turn( p )
-      break
+      # Heal
+      elif p == 'h' and update_inv( I_HEALTH_POTION, 0, 't' ) >= 1:
+        print( '[!] You used a healing potion.' )
+        print( f'[*] YOU: +{ min( g_hp + 100, g_hp_max ) - g_hp } HP' )
+        g_hp = min( g_hp + 100, g_hp_max )
+        g_monster.turn( 'n', player_turn = True )
+        break
 
-    # Invalid input
-    else:
-      print( '[#] Unknown command.' )
+      # Turn
+      elif p in allowed_inputs:
+        g_monster.turn( p, player_turn = True )
+        break
+
+      # Invalid input
+      else:
+        print( '[#] Unknown command.' )
 
   # ENEMY TURN
   print_line()
   print( f'You: { g_hp } HP' )
   print( f"{ g_monster.name.replace( '_', ' ' ).title() }: { g_monster.hp } HP" )
   allowed_inputs = g_monster.get_options( player_turn = False )
-  if update_inv( I_HEALTH_POTION, 0, 't' ) >= 1:
-    print( '[H] Drink health potion' )
   print( '[!] Attempt escape' )
   print( '[*] Pause' )
 
@@ -3162,7 +3332,7 @@ def room_fight():
 
     # Pause
     if p == '*':
-      goto_room( room_pause, 'goto_room( room_fight )' )
+      goto_room( room_pause, 'goto_room( room_fight, \'1\' )' )
 
     # Escape
     elif p == '!':
@@ -3172,20 +3342,12 @@ def room_fight():
         goto_room( room_scene )
       else:
         print( '[!] Your attempt to escape was unsuccessful.' )
-        g_monster.monster_turn( '!' )
-      break
-
-    # Heal
-    elif p == 'h' and update_inv( I_HEALTH_POTION, 0, 't' ) >= 1:
-      print( '[!] You used a healing potion.' )
-      print( f'[*] YOU: +{ min( g_hp + 100, g_hp_max ) - g_hp } HP' )
-      g_hp = min( g_hp + 100, g_hp_max )
-      g_monster.monster_turn( '!' )
+        g_monster.turn( '!', player_turn = False )
       break
 
     # Turn
     elif p in allowed_inputs:
-      g_monster.monster_turn( p )
+      g_monster.turn( p, player_turn = False )
       break
 
     # Invalid input
@@ -3197,9 +3359,75 @@ def room_fight():
 
   goto_room( room_fight )
 
+def room_bossfight():
+
+  global g_monster, g_hp
+
+  # PLAYER TURN
+  print_line()
+  print( f'You: { g_hp } HP' )
+  print( f"Eye of Cthulhu: { g_monster.hp } HP" )
+  allowed_inputs = g_monster.get_options( player_turn = True )
+  print( '\n(CHOOSE A 3-MOVE COMBO)\n' )
+  print( '[*] Pause' )
+
+  # Get inputs
+  while True:
+    p = input( '> ' ).lower()
+
+    # Pause
+    if p == '*':
+      goto_room( room_pause, 'goto_room( room_bossfight )' )
+
+    # Turn
+    elif len( p.split( ' ' ) ) == 3 and False not in [ i in allowed_inputs for i in p.split( ' ' ) ]:
+      g_monster.turn( p.split( ' ' ), player_turn = True )
+      break
+
+    elif len( p.split( ' ' ) ) != 3:
+      print( '[#] Enter 3 moves separated by spaces.' )
+
+    # Invalid input
+    else:
+      print( '[#] Unknown command.' )
+
+  # ENEMY TURN
+  print_line()
+  print( f'You: { g_hp } HP' )
+  print( f"Eye of Cthulhu: { g_monster.hp } HP" )
+  allowed_inputs = g_monster.get_options( player_turn = False )
+  print( '\n(CHOOSE A 3-MOVE COMBO)\n' )
+  print( '[*] Pause' )
+
+  # Get inputs
+  while True:
+    p = input( '> ' ).lower()
+
+    # Pause
+    if p == '*':
+      goto_room( room_pause, 'goto_room( room_bossfight )' )
+
+    # Escape
+    elif '!' in p:
+      print( '[!] There is no escape.' )
+
+    # Turn
+    elif len( p.split( ' ' ) ) == 3 and False not in [ i in allowed_inputs for i in p.split( ' ' ) ]:
+      g_monster.turn( p.split( ' ' ), player_turn = False )
+      break
+
+    # Invalid input
+    else:
+      print( '[#] Unknown command.' )
+
+  # Save player data
+  data_save()
+
+  goto_room( room_bossfight )
+
 def room_death():
 
-  global g_hp, g_deaths
+  global g_hp, g_pos, g_deaths
 
   g_deaths += 1
 
@@ -3218,6 +3446,7 @@ def room_death():
   print( 'Respawning!' + ' ' * 20 )
 
   g_hp = g_hp_max
+  g_pos = g_spawn
 
   goto_room( room_scene )
 
