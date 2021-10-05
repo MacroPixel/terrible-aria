@@ -1,8 +1,8 @@
-WEB = True
+WEB = False
 
 if WEB:
   from browser import document
-  from browser import aio as asyncio
+  from browser import aio as aio
 
 import os
 from math import sin, cos
@@ -13,7 +13,7 @@ import time
 # Used for switching rooms
 class MoveException( BaseException ):
 
-  async def __init__( self, room, arg ):
+  def __init__( self, room, arg ):
     self.room = room
     self.arg = arg
 
@@ -22,18 +22,18 @@ class MoveException( BaseException ):
 # e.g. instead of writing `a = V2( a.x * 3, a.y * 5 )`, you can write `a.m( 3, 5 )`
 class V2:
 
-  async def __init__( self, x = 0, y = 0 ):
+  def __init__( self, x = 0, y = 0 ):
     self.u( x, y )
 
   # These two functions help to reduce repetitive code within the operation functions
-  async def __op( self, a, b, op ):
+  def __op( self, a, b, op ):
 
     if op == '+': return a + b
     if op == '-': return a - b
     if op == '*': return a * b
     if op == '/': return a / b
 
-  async def __op2( self, a, b, op ):
+  def __op2( self, a, b, op ):
 
     if isinstance( a, V2 ):
       self.x = self.__op( self.x, a.x, op )
@@ -43,37 +43,37 @@ class V2:
       self.y = self.__op( self.y, a if b == 'd' else b, op )
 
   # Update
-  async def u( self, a = 0, b = 0 ):
+  def u( self, a = 0, b = 0 ):
     self.x = a
     self.y = b
     return self
 
   # Add
-  async def a( self, a, b = 'd' ):
+  def a( self, a, b = 'd' ):
     self.__op2( a, b, '+' )
     return self
 
   # Subtract
-  async def s( self, a, b = 'd' ):
+  def s( self, a, b = 'd' ):
     self.__op2( a, b, '-' )
     return self
 
   # Multiply
-  async def m( self, a, b = 'd' ):
+  def m( self, a, b = 'd' ):
     self.__op2( a, b, '*' )
     return self
 
   # Divide
-  async def d( self, a, b = 'd' ):
+  def d( self, a, b = 'd' ):
     self.__op2( a, b, '/' )
     return self
 
   # Return a list
-  async def l( self ):
+  def l( self ):
     return [ self.x, self.y ]
 
   # Return a copy
-  async def copy( self ):
+  def copy( self ):
     c = V2( self.x, self.y )
     return c
 
@@ -218,7 +218,7 @@ if WEB:
 
 # Special print function for the browser
 old_print = print
-async def print( text, end = '\n' ):
+def print( text, end = '\n' ):
 
   if WEB:
     document.getElementById( 'cmd_output' ).innerHTML += ( str( text ) + end ).replace( '\n', '<br>' )
@@ -241,36 +241,36 @@ async def input( text ):
 
   else:
 
-    return input( text )
+    return old_input( text )
 
 # Special timer function for the browser
 old_sleep = time.sleep
 async def sleep( ms ):
 
   if WEB:
-    await asyncio.sleep(delay)
+    await aio.sleep( ms )
   else:
     old_sleep( ms )
   return
 
 # Returns a number such that min <= x <= max
-async def clamp( n, mn, mx ):
+def clamp( n, mn, mx ):
 
   return min( max( n, mn ), mx )
 
 # Returns the distance between two vector objects
-async def dist( a, b ):
+def dist( a, b ):
 
   return ( ( a.x - b.x ) ** 2 + ( a.y - b.y ) ** 2 ) ** 0.5
 
-async def get_tile( a, b = 0 ):
+def get_tile( a, b = 0 ):
 
   if isinstance( a, V2 ):
     return g_tile_data[ xy2c( a.x, a.y, g_world_size.x ) ]
   else:
     return g_tile_data[ xy2c( a, b, g_world_size.x ) ]
 
-async def item_meta( item_id, component = 0, c = 0 ):
+def item_meta( item_id, component = 0, c = 0 ):
 
   # Correct ID if c is flagged as 1
   if c == 1:
@@ -281,7 +281,7 @@ async def item_meta( item_id, component = 0, c = 0 ):
   return ITEM_META[ item_id ][ component ]
 
 # Updates global time since last queried
-async def update_playtime():
+def update_playtime():
 
   global g_play_time, g_play_time_last
 
@@ -291,7 +291,7 @@ async def update_playtime():
   g_play_time_last = time.time()
 
 # Prints playtime in DD:HH:MM:SS format
-async def format_playtime( tm ):
+def format_playtime( tm ):
 
   t_d = tm // 86400
   t_h = ( tm % 86400 ) // 3600
@@ -307,17 +307,17 @@ async def format_playtime( tm ):
   return t_str
 
 # Flattens a 2D index [x, y] down to a 1D index [c]
-async def xy2c( x, y, w ):
+def xy2c( x, y, w ):
 
   return ( y * w ) + x
 
 # Inflates a 1D index [c] into a 2D index [x, y]
-async def c2xy( c, w ):
+def c2xy( c, w ):
 
   return ( c % w, c // w )
 
 # Converts a block's character-ID into the character displayed in-game
-async def char2tile( c ):
+def char2tile( c ):
 
   if c == ' ': return g_tmap[ 'air' ]
   if c == 'g': return g_tmap[ 'grass' ]
@@ -609,7 +609,7 @@ class Monster:
     'tim': [ ( -1, 2, I_MAGIC_STAFF ), ( 2, 5, I_HEALTH_POTION ) ]
  }
 
-  async def __init__( self, name ):
+  def __init__( self, name ):
 
     self.hp = self.HEALTHS[ name ]
     self.name = name if ( name in self.TYPES ) else 'slime'
@@ -628,7 +628,7 @@ class Monster:
       self.move_c = self.move
 
   # Deals damage to self, allowing a random range and multiplier to be used
-  async def damage( self, a, b, method = '', entity = 'self' ):
+  def damage( self, a, b, method = '', entity = 'self' ):
 
     global g_hp
 
@@ -658,7 +658,7 @@ class Monster:
       g_hp -= amount
     return amount
 
-  async def update_stats( self ):
+  def update_stats( self ):
 
     # Determine sword
     self.weapon_melee = 'none'
@@ -698,7 +698,7 @@ class Monster:
     if update_inv( I_S_ARMOR, 0, mode = 't' ) > 0: self.armor = 'silver'
     if update_inv( I_G_ARMOR, 0, mode = 't' ) > 0: self.armor = 'gold'
 
-  async def get_options( self, player_turn, should_print = True ):
+  def get_options( self, player_turn, should_print = True ):
 
     self.update_stats() # Query weapon, armor, etc.
 
@@ -734,7 +734,7 @@ class Monster:
 
     return options_list
   
-  async def turn( self, p, player_turn ):
+  def turn( self, p, player_turn ):
 
     # Allows attacks to do the proper amount of damage
     self.update_stats()
@@ -823,7 +823,7 @@ class Monster:
       await input( '[!] Press enter to exit the fight. ' )
       goto_room( room_death )
 
-  async def give_items( self ):
+  def give_items( self ):
 
     # Stores all the items the player will receive
     temp_items = []
@@ -862,7 +862,7 @@ class Monster:
       print( f'and {temp_items[-1][1]}x {item_meta( temp_items[-1][0] )}.' )
       update_inv( temp_items[-1][0], temp_items[-1][1] )
 
-  async def advance_move( self ):
+  def advance_move( self ):
 
     # If you're trying to find each enemy's attack pattern,
     # this is where you want to look
@@ -917,7 +917,7 @@ class EyeOfCthulhu( Monster ):
   # there's too many possible outcomes, so it's only defined for each weapon type)
   DAMAGE_RANGES = {'s': ( 8, 16 ), 'b': ( 6, 12 ), 'g': ( 24, 48 )}
 
-  async def __init__( self ):
+  def __init__( self ):
 
     self.hp = 2048
 
@@ -929,7 +929,7 @@ class EyeOfCthulhu( Monster ):
 
     self.charged = False
 
-  async def get_options( self, player_turn, should_print = True ):
+  def get_options( self, player_turn, should_print = True ):
 
     self.update_stats() # Query weapon, armor, etc.
 
@@ -1073,10 +1073,7 @@ class EyeOfCthulhu( Monster ):
         print( f"[*] {'Boss' if player_turn else 'You'}: -{dmg_amount} HP"  )
 
       # Check if fight is over
-      self.hp_check()
-
-      # Wait
-      await sleep( 0.5 )
+      await self.hp_check()
 
     # Advance move
     self.advance_move()
@@ -1096,23 +1093,23 @@ class EyeOfCthulhu( Monster ):
       await input( '[!] Press enter to exit the fight. ' )
       goto_room( room_death )
 
-  async def advance_move( self ):
+  def advance_move( self ):
 
     self.move_c += 1
     self.move[0] = ( self.move[0] + ( 2 if self.move_c % 2 else 3 ) ) % 4
     self.move[1] = list( 'bca' )[ list( 'abc' ).index( self.move[1] ) ]
 
 # Switches rooms
-async def goto_room( room, arg = '' ):
+def goto_room( room, arg = '' ):
   raise MoveException( room, arg )
 
 # Prints line
-async def print_line():
+def print_line():
   print( '- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -' )
 
 # Prints the worldgen progress
 # I don't think it's important to explain what the arguments do
-async def print_progress( prog, div_this, div_total, s ):
+def print_progress( prog, div_this, div_total, s ):
 
   prog += ( 1 / div_this ) * ( div_total / 2 ) # Add to progress
   suffix = f'{int( prog * 2 )}% ' if prog < 50 else 'Done!' # Create a suffix that contains the progress/current task
@@ -1125,7 +1122,7 @@ async def print_progress( prog, div_this, div_total, s ):
 # A function used for the top of the world
 # (A really interesting bug came up when I was integrating this function into worldgen,
 # so I may or may not make a supplemental video dedicated to explaining it)
-async def noise_top( x, seed ):
+def noise_top( x, seed ):
 
   next_seed = random.randint( 1, 10 ** 12 )
   random.seed( seed )
@@ -1153,7 +1150,7 @@ async def tick( nofall = False ):
   g_enemy_timer -= 1
   if g_enemy_timer <= 0:
     g_enemy_timer = random.randint( 20, 35 )
-    try_fight()
+    await try_fight()
 
   # Regen health
   g_hp = min( g_hp + 1, g_hp_max )
@@ -1162,7 +1159,7 @@ async def tick( nofall = False ):
 
 # Modify the inventory
 # Modes = pickup, remove, or set
-async def update_inv( item_id, amount, mode = 'p', slot = 0, allow_stash = True ):
+def update_inv( item_id, amount, mode = 'p', slot = 0, allow_stash = True ):
 
   global g_items, g_items_extra
 
@@ -1257,7 +1254,7 @@ async def update_inv( item_id, amount, mode = 'p', slot = 0, allow_stash = True 
   data_save()
 
 # Create new (empty) chest
-async def chest_create( x, y ):
+def chest_create( x, y ):
 
   global g_tile_special
 
@@ -1265,7 +1262,7 @@ async def chest_create( x, y ):
   for i in range( 10 ):
     g_tile_special[ f'{x} : {y}' ][ f'slot{i}' ] = '0:0'
 
-async def chest_modify( x, y, item_id, amount, mode = 'i' ):
+def chest_modify( x, y, item_id, amount, mode = 'i' ):
 
   global g_tile_special
   
@@ -1307,13 +1304,13 @@ async def chest_modify( x, y, item_id, amount, mode = 'i' ):
     # Failed to remove
     return 0
 
-async def chest_remove( x, y ):
+def chest_remove( x, y ):
 
   global g_tile_special
 
   g_tile_special.pop( f'{x} : {y}' )
 
-async def chest_slot( x, y, s, a = 0, amount = False, op = '?' ):
+def chest_slot( x, y, s, a = 0, amount = False, op = '?' ):
 
   global g_tile_special
 
@@ -1331,7 +1328,7 @@ async def chest_slot( x, y, s, a = 0, amount = False, op = '?' ):
   g_tile_special[ f'{x} : {y}' ][ f'slot{s}' ] = f'{values[0]}:{values[1]}'
 
 # Break a block
-async def break_block( x, y, ignore_tree = False ):
+def break_block( x, y, ignore_tree = False ):
 
   global g_tile_data, g_tile_special
 
@@ -1386,7 +1383,7 @@ async def break_block( x, y, ignore_tree = False ):
   return old_value
 
 # Place a block
-async def place_block( x, y ):
+def place_block( x, y ):
 
   global g_tile_data
 
@@ -1438,7 +1435,7 @@ async def try_break_block( x, y ):
       update_inv( ITEM_BLOCKS[ old_value ], 1 )
 
     # Performing a game tick prevents the player from floating above it like a cartoon character
-    tick()
+    await tick()
     goto_room( room_scene ) # We can now reload the room
 
 # This function also exists to reduce code repetition
@@ -1470,7 +1467,7 @@ async def try_place_block( x, y ):
       update_inv( g_items[ g_slot ][0], 1, 'r' )
 
     # Performing a game tick prevents the player from floating above it like a cartoon character
-    tick()
+    await tick()
     goto_room( room_scene ) # We can now reload the room
 
 async def try_fight():
@@ -1479,25 +1476,25 @@ async def try_fight():
 
   # Top 25% - Harpies only
   if ( g_pos.y <= g_world_size.y * 0.25 ):
-    start_fight( 'harpy' )
+    await start_fight( 'harpy' )
 
   # 40%-60% - 50% slime, 30% zombie, 20% demon_eye
   elif ( g_world_size.y * 0.25 < g_pos.y <= g_world_size.y * 0.6 ):
-    if ( temp_rand < 50 ): start_fight( 'slime' )
-    elif ( temp_rand < 80 ): start_fight( 'zombie' )
-    else: start_fight( 'demon_eye' )
+    if ( temp_rand < 50 ): await start_fight( 'slime' )
+    elif ( temp_rand < 80 ): await start_fight( 'zombie' )
+    else: await start_fight( 'demon_eye' )
 
   # 60%-80% - 70% cave bat, 30% skeleton
   elif ( g_world_size.y * 0.6 < g_pos.y <= g_world_size.y * 0.8 ):
-    if ( temp_rand < 70 ): start_fight( 'cave_bat' )
-    else: start_fight( 'skeleton' )
+    if ( temp_rand < 70 ): await start_fight( 'cave_bat' )
+    else: await start_fight( 'skeleton' )
 
   # Bottom 20% - 30% cave bat, 15% skeleton, 50% undead miner, 5% tim
   elif ( g_world_size.y * 0.8 < g_pos.y ):
-    if ( temp_rand < 30 ): start_fight( 'cave_bat' )
-    elif ( temp_rand < 80 ): start_fight( 'undead_miner' )
-    elif ( temp_rand < 95 ): start_fight( 'skeleton' )
-    else: start_fight( 'tim' )
+    if ( temp_rand < 30 ): await start_fight( 'cave_bat' )
+    elif ( temp_rand < 80 ): await start_fight( 'undead_miner' )
+    elif ( temp_rand < 95 ): await start_fight( 'skeleton' )
+    else: await start_fight( 'tim' )
 
 async def start_fight( monster_id ):
   
@@ -1524,12 +1521,12 @@ async def start_bossfight():
   goto_room( room_bossfight )
 
 # Initialize the data file if it doesn't exist
-async def data_main_init():
+def data_main_init():
 
   # I don't actually think I need to put anything here
   pass
 
-async def data_char_init( name ):
+def data_char_init( name ):
 
   global g_hp, g_hp_max, g_items, g_items_extra
 
@@ -1542,7 +1539,7 @@ async def data_char_init( name ):
     g_items.append( [ 0, 0 ] )
   g_items_extra = []
 
-async def generate_world( size, seed ):
+def generate_world( size, seed ):
 
   # WORLDGEN PARAMETERS
   CAVES = True
@@ -1813,7 +1810,7 @@ async def generate_world( size, seed ):
   print() # Newline
 
 # Initialize a world file upon creation
-async def data_world_init( name, seed ):
+def data_world_init( name, seed ):
 
   global g_pos, g_spawn, g_world_size, g_seed, g_tile_data, g_tile_special, g_show_help, g_slot, g_versions, g_play_time_last, g_enemy_timer
 
@@ -1821,7 +1818,7 @@ async def data_world_init( name, seed ):
   g_world_size = V2( 400, 200 )
   generate_world( g_world_size, seed )
 
-async def data_save():
+def data_save():
   
   global g_data
   
@@ -2096,7 +2093,7 @@ async def room_scene( arg = '' ):
 
   while True:
     p = await input( '> ' )
-    parse_scene_cmd( p )
+    await parse_scene_cmd( p )
 
 async def parse_scene_cmd( cmd ):
 
@@ -2249,7 +2246,7 @@ async def parse_scene_cmd( cmd ):
                 g_pos.a( ( 1 if p.split( ' ' )[1][0] == 'r' else -1 ), -1 )
 
           data_save()
-          tick()
+          await tick()
           goto_room( room_scene )
 
   # Jump command
@@ -2273,7 +2270,7 @@ async def parse_scene_cmd( cmd ):
 
       # If not on block and not on floor (unless they have wings), run game tick and reload stage
       elif g_pos.y + 1 < g_world_size.y and get_tile( g_pos.x, g_pos.y + 1 ) in AIR_BLOCKS and update_inv( I_HARPY_WINGS, 0, mode = 't' ) == 0:
-        tick()
+        await tick()
         goto_room( room_scene )
 
       # Jump, run game tick, save data, and reload stage
@@ -2285,7 +2282,7 @@ async def parse_scene_cmd( cmd ):
             g_pos.y -= 1
 
         data_save()
-        tick( nofall = True )
+        await tick( nofall = True )
         goto_room( room_scene )
   
   # Down command
@@ -2294,13 +2291,13 @@ async def parse_scene_cmd( cmd ):
     # Go through platform
     if g_pos.y < g_world_size.y - 1 and get_tile( g_pos.copy().a( 0, 1 ) ) == 'p':
       g_pos.a( 0, 1 )
-    tick()
+    await tick()
     goto_room( room_scene )
 
   # Wait
   elif p == 'w':
 
-    tick()
+    await tick()
     goto_room( room_scene )
 
   # Inventory
@@ -2342,7 +2339,7 @@ async def parse_scene_cmd( cmd ):
 
       if g_items[ g_slot ][ 0 ] == I_SUS_EYE:
         update_inv( I_SUS_EYE, 1, 'r' )
-        start_bossfight()
+        await start_bossfight()
 
       elif g_items[ g_slot ][ 0 ] == I_HEALTH_POTION:
         update_inv( I_HEALTH_POTION, 1, 'r' )
@@ -2382,7 +2379,7 @@ async def parse_scene_cmd( cmd ):
 
       if p[0] == 'z' and p[2] in ( 'l', 'r' ):
 
-        parse_scene_cmd( f'm ' + p[2:] )
+        await parse_scene_cmd( f'm ' + p[2:] )
       goto_room( room_scene )
 
     # If not, then the z command would have invalid arguments
@@ -2551,7 +2548,7 @@ async def parse_scene_cmd( cmd ):
       if p[8:] not in Monster.TYPES:
         print( '[#] Invalid monster ID.' )
       else:
-        start_fight( p[8:] )
+        await start_fight( p[8:] )
 
     # Execute code
     elif p[2:] == 'execute':
@@ -3315,4 +3312,4 @@ async def run():
   # which isn't helpful if I want to be able to read a crash message.)
   await input( 'Press enter to exit.' )
 
-run()
+aio.run( run() )
