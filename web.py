@@ -1,3 +1,9 @@
+WEB = True
+
+if WEB:
+  from browser import document
+  from browser import aio as asyncio
+
 import os
 from math import sin, cos
 import random
@@ -7,7 +13,7 @@ import time
 # Used for switching rooms
 class MoveException( BaseException ):
 
-  def __init__( self, room, arg ):
+  async def __init__( self, room, arg ):
     self.room = room
     self.arg = arg
 
@@ -16,18 +22,18 @@ class MoveException( BaseException ):
 # e.g. instead of writing `a = V2( a.x * 3, a.y * 5 )`, you can write `a.m( 3, 5 )`
 class V2:
 
-  def __init__( self, x = 0, y = 0 ):
+  async def __init__( self, x = 0, y = 0 ):
     self.u( x, y )
 
   # These two functions help to reduce repetitive code within the operation functions
-  def __op( self, a, b, op ):
+  async def __op( self, a, b, op ):
 
     if op == '+': return a + b
     if op == '-': return a - b
     if op == '*': return a * b
     if op == '/': return a / b
 
-  def __op2( self, a, b, op ):
+  async def __op2( self, a, b, op ):
 
     if isinstance( a, V2 ):
       self.x = self.__op( self.x, a.x, op )
@@ -37,37 +43,37 @@ class V2:
       self.y = self.__op( self.y, a if b == 'd' else b, op )
 
   # Update
-  def u( self, a = 0, b = 0 ):
+  async def u( self, a = 0, b = 0 ):
     self.x = a
     self.y = b
     return self
 
   # Add
-  def a( self, a, b = 'd' ):
+  async def a( self, a, b = 'd' ):
     self.__op2( a, b, '+' )
     return self
 
   # Subtract
-  def s( self, a, b = 'd' ):
+  async def s( self, a, b = 'd' ):
     self.__op2( a, b, '-' )
     return self
 
   # Multiply
-  def m( self, a, b = 'd' ):
+  async def m( self, a, b = 'd' ):
     self.__op2( a, b, '*' )
     return self
 
   # Divide
-  def d( self, a, b = 'd' ):
+  async def d( self, a, b = 'd' ):
     self.__op2( a, b, '/' )
     return self
 
   # Return a list
-  def l( self ):
+  async def l( self ):
     return [ self.x, self.y ]
 
   # Return a copy
-  def copy( self ):
+  async def copy( self ):
     c = V2( self.x, self.y )
     return c
 
@@ -161,11 +167,11 @@ DEBUG = True
 SHOW_PROG = False
 AIR_BLOCKS = [ ' ', 'l', 'L', 'c', 'C', 'p' ]
 PLATFORM_BLOCKS = [ 'p' ]
-ITEM_BLOCKS = { 'g': I_GRASS, 's': I_STONE, 'w': I_WOOD, 'l': I_WOOD, 'i': I_IRON_ORE, 'S': I_SILVER_ORE, 'G': I_GOLD_ORE,
-  'p': I_PLATFORM, 'c': I_CHEST, 'C': I_CRYSTAL }
+ITEM_BLOCKS = {'g': I_GRASS, 's': I_STONE, 'w': I_WOOD, 'l': I_WOOD, 'i': I_IRON_ORE, 'S': I_SILVER_ORE, 'G': I_GOLD_ORE,
+  'p': I_PLATFORM, 'c': I_CHEST, 'C': I_CRYSTAL}
 
 # GLOBAL VARIABLES
-g_data = {}
+g_data = ''
 g_cname = ''
 g_wname = ''
 g_pos = V2( 0, 0 )
@@ -203,24 +209,68 @@ g_tmap = {
 }
 g_monster = 0
 
+if WEB:
+  submitted_bool = False
+  document.submitted_bool = submitted_bool
+
+  submitted_text = ''
+  document.submitted_text = submitted_text
+
+# Special print function for the browser
+old_print = print
+async def print( text, end = '\n' ):
+
+  if WEB:
+    document.getElementById( 'cmd_output' ).innerHTML += ( str( text ) + end ).replace( '\n', '<br>' )
+  else:
+    old_print( text, end )
+
+# Special input function for the browser
+old_input = input
+async def input( text ):
+
+  if WEB:
+
+    global submitted_bool, submitted_text
+
+    submitted_bool = False
+    while submitted_bool == False:
+      await sleep( 0.1 )
+    print( submitted_text )
+    return submitted_text
+
+  else:
+
+    return input( text )
+
+# Special timer function for the browser
+old_sleep = time.sleep
+async def sleep( ms ):
+
+  if WEB:
+    await asyncio.sleep(delay)
+  else:
+    old_sleep( ms )
+  return
+
 # Returns a number such that min <= x <= max
-def clamp( n, mn, mx ):
+async def clamp( n, mn, mx ):
 
   return min( max( n, mn ), mx )
 
 # Returns the distance between two vector objects
-def dist( a, b ):
+async def dist( a, b ):
 
   return ( ( a.x - b.x ) ** 2 + ( a.y - b.y ) ** 2 ) ** 0.5
 
-def get_tile( a, b = 0 ):
+async def get_tile( a, b = 0 ):
 
   if isinstance( a, V2 ):
     return g_tile_data[ xy2c( a.x, a.y, g_world_size.x ) ]
   else:
     return g_tile_data[ xy2c( a, b, g_world_size.x ) ]
 
-def item_meta( item_id, component = 0, c = 0 ):
+async def item_meta( item_id, component = 0, c = 0 ):
 
   # Correct ID if c is flagged as 1
   if c == 1:
@@ -231,7 +281,7 @@ def item_meta( item_id, component = 0, c = 0 ):
   return ITEM_META[ item_id ][ component ]
 
 # Updates global time since last queried
-def update_playtime():
+async def update_playtime():
 
   global g_play_time, g_play_time_last
 
@@ -241,7 +291,7 @@ def update_playtime():
   g_play_time_last = time.time()
 
 # Prints playtime in DD:HH:MM:SS format
-def format_playtime( tm ):
+async def format_playtime( tm ):
 
   t_d = tm // 86400
   t_h = ( tm % 86400 ) // 3600
@@ -249,25 +299,25 @@ def format_playtime( tm ):
   t_s = ( tm % 60 )
 
   t_str = ""
-  t_str += f'{ t_d }d ' if tm >= 86400 else ''
-  t_str += f'{ t_h }h ' if tm >= 3600 else ''
-  t_str += f'{ t_m }m ' if tm >= 60 else ''
-  t_str += f'{ t_s }s'
+  t_str += f'{t_d}d ' if tm >= 86400 else ''
+  t_str += f'{t_h}h ' if tm >= 3600 else ''
+  t_str += f'{t_m}m ' if tm >= 60 else ''
+  t_str += f'{t_s}s'
 
   return t_str
 
 # Flattens a 2D index [x, y] down to a 1D index [c]
-def xy2c( x, y, w ):
+async def xy2c( x, y, w ):
 
   return ( y * w ) + x
 
 # Inflates a 1D index [c] into a 2D index [x, y]
-def c2xy( c, w ):
+async def c2xy( c, w ):
 
   return ( c % w, c // w )
 
 # Converts a block's character-ID into the character displayed in-game
-def char2tile( c ):
+async def char2tile( c ):
 
   if c == ' ': return g_tmap[ 'air' ]
   if c == 'g': return g_tmap[ 'grass' ]
@@ -295,7 +345,7 @@ class Monster:
   HEALTHS = {
     'slime' : 50, 'zombie' : 90, 'demon_eye' : 70, 'cave_bat' : 40,
     'skeleton' : 150, 'undead_miner' : 120, 'harpy' : 80, 'tim' : 200
-  }
+ }
 
   # The player's options for each player turn
   # Format: [ Letter ID, Action Name, Requirements ]
@@ -309,7 +359,7 @@ class Monster:
     'undead_miner' : [ [ 's', 'Swing sword', 's' ], [ 'a', 'Shoot arrow', 'b' ], [ 'n', 'Do nothing' ] ],
     'harpy' : [ [ 'g', 'Throw grenade', 'g' ], [ 'r', 'Shoot rightward', 'b' ], [ 'l', 'Shoot leftward', 'b' ], [ 'n', 'Do nothing' ] ],
     'tim' : [ [ 's', 'Swing sword', 's' ], [ 'a', 'Shoot arrow', 'b' ], [ 'g', 'Throw grenade', 'g' ], [ 'n', 'Do nothing' ] ]
-  }
+ }
 
   # The monster's options for each player turn
   MONSTER_DODGES = {
@@ -321,7 +371,7 @@ class Monster:
     'undead_miner' : [ 'deflect', 'jump' ],
     'harpy' : [ 'fly upward', 'fly rightward', 'fly leftward' ],
     'tim' : [ 'reflect', 'charge attack', 'heal', 'teleport' ]
-  }
+ }
 
   # The result of each player turn
   # Format: [ Text + HP Lost + modifier ]
@@ -426,7 +476,7 @@ class Monster:
     'tim : n : charge attack' : [ 'The enemy charged its next attack.', 0, 'c' ],
     'tim : n : heal' : [ 'The enemy healed itself.', 0, 'h' ],
     'tim : n : teleport' : [ 'The enemy teleported away from you.' ]
-  }
+ }
 
   # The player's options for each monster turn
   # Format: [ Letter ID, Action Name, Requirements ]
@@ -439,7 +489,7 @@ class Monster:
     'undead_miner' : [ [ 'j', 'Jump' ], [ 'f', 'Step forward' ], [ 's', 'Remain stationary' ] ],
     'harpy' : [ [ 'j', 'Jump' ], [ 'b', 'Move backward' ], [ 's', 'Move sideways' ] ],
     'tim' : [ [ 's', 'Remain stationary' ], [ 'j', 'Jump' ], [ 'r', 'Move rightward' ], [ 'l', 'Move leftward' ] ]
-  }
+ }
 
   # The monster's options for each monster turn
   MONSTER_ATTACKS = {
@@ -451,7 +501,7 @@ class Monster:
     'undead_miner' : [ 'charge', 'grenade' ],
     'harpy' : [ 'from top', 'from front', 'from side' ],
     'tim' : [ 'normal spell', 'dual spell', 'circular spell', 'teleports behind you' ]
-  }
+ }
 
   # The result of each monster turn
   # Format: [ Text + HP Lost + Modifiers ]
@@ -543,7 +593,7 @@ class Monster:
     'tim : ! : dual spell' : [ 'The enemy shot a dual spell to your right and left.' ],
     'tim : ! : circular spell' : [ 'The enemy shot a circular spell around you.' ],
     'tim : ! : teleports behind you' : [ 'The enemy teleported behind you.', ( 15, 25 ) ]
-  }
+ }
 
   # Determines the chances for each item drop
   # -1 in index 0 means 1 in (index 1) chance of dropping
@@ -557,9 +607,9 @@ class Monster:
     'undead_miner': [ ( 4, 10, I_GRENADE ), ( 2, 3, I_HEALTH_POTION ) ],
     'harpy': [ ( 1, 3, I_FEATHER ), ( 2, 3, I_HEALTH_POTION ) ],
     'tim': [ ( -1, 2, I_MAGIC_STAFF ), ( 2, 5, I_HEALTH_POTION ) ]
-  }
+ }
 
-  def __init__( self, name ):
+  async def __init__( self, name ):
 
     self.hp = self.HEALTHS[ name ]
     self.name = name if ( name in self.TYPES ) else 'slime'
@@ -578,7 +628,7 @@ class Monster:
       self.move_c = self.move
 
   # Deals damage to self, allowing a random range and multiplier to be used
-  def damage( self, a, b, method = '', entity = 'self' ):
+  async def damage( self, a, b, method = '', entity = 'self' ):
 
     global g_hp
 
@@ -608,7 +658,7 @@ class Monster:
       g_hp -= amount
     return amount
 
-  def update_stats( self ):
+  async def update_stats( self ):
 
     # Determine sword
     self.weapon_melee = 'none'
@@ -648,7 +698,7 @@ class Monster:
     if update_inv( I_S_ARMOR, 0, mode = 't' ) > 0: self.armor = 'silver'
     if update_inv( I_G_ARMOR, 0, mode = 't' ) > 0: self.armor = 'gold'
 
-  def get_options( self, player_turn, should_print = True ):
+  async def get_options( self, player_turn, should_print = True ):
 
     self.update_stats() # Query weapon, armor, etc.
 
@@ -671,29 +721,29 @@ class Monster:
 
         suffix = ''
         if len( s ) > 2 and s[2] == 's':
-          suffix += f"({ ( 'Copper Shortsword', 'Iron Broadsword', 'Silver Broadsword', 'Gold Broadsword', 'Magic Staff' )[ ( 'copper', 'iron', 'silver', 'gold', 'staff' ).index( self.weapon_melee ) ] })"
+          suffix += f"({( 'Copper Shortsword', 'Iron Broadsword', 'Silver Broadsword', 'Gold Broadsword', 'Magic Staff' )[ ( 'copper', 'iron', 'silver', 'gold', 'staff' ).index( self.weapon_melee ) ]})"
         if len( s ) > 2 and s[2] == 'b':
-          suffix += f"({ ( 'Bow', 'Iron Bow', 'Silver Bow', 'Gold Bow' )[ ( 'wood', 'iron', 'silver', 'gold' ).index( self.weapon_bow[0] ) ] } + "
-          suffix += f"{ ( 'Arrow', 'Flaming Arrow' )[ ( 'arrow', 'flame_arrow' ).index( self.weapon_bow[1] ) ] } x"
-          suffix += f"{ update_inv( ( I_ARROW, I_F_ARROW )[ ( 'arrow', 'flame_arrow' ).index( self.weapon_bow[1] ) ], 0, mode = 't' ) })"
+          suffix += f"({( 'Bow', 'Iron Bow', 'Silver Bow', 'Gold Bow' )[ ( 'wood', 'iron', 'silver', 'gold' ).index( self.weapon_bow[0] ) ]} + "
+          suffix += f"{( 'Arrow', 'Flaming Arrow' )[ ( 'arrow', 'flame_arrow' ).index( self.weapon_bow[1] ) ]} x"
+          suffix += f"{update_inv( ( I_ARROW, I_F_ARROW )[ ( 'arrow', 'flame_arrow' ).index( self.weapon_bow[1] ) ], 0, mode = 't' )})"
         if len( s ) > 2 and s[2] == 'g':
-          suffix += f"(Grenade x{ update_inv( I_GRENADE, 0, mode = 't' ) })"
+          suffix += f"(Grenade x{update_inv( I_GRENADE, 0, mode = 't' )})"
 
-        print( f'[{ s[0].upper() }] { s[1] } { suffix }' )
+        print( f'[{s[0].upper()}] {s[1]} {suffix}' )
       options_list.append( s[0].lower() )
 
     return options_list
   
-  def turn( self, p, player_turn ):
+  async def turn( self, p, player_turn ):
 
     # Allows attacks to do the proper amount of damage
     self.update_stats()
 
     # Get result of action [text, damage, modifiers]
     if player_turn:
-      result = self.P_TURN_RESULTS[ f'{ self.name } : { p } : { self.MONSTER_DODGES[ self.name ][ self.move ] }' ]
+      result = self.P_TURN_RESULTS[ f'{self.name} : {p} : {self.MONSTER_DODGES[ self.name ][ self.move ]}' ]
     else:
-      result = self.M_TURN_RESULTS[ f'{ self.name } : { p } : { self.MONSTER_ATTACKS[ self.name ][ self.move ] }' ]
+      result = self.M_TURN_RESULTS[ f'{self.name} : {p} : {self.MONSTER_ATTACKS[ self.name ][ self.move ]}' ]
 
     # Attacks can have different outcomes by using [ chance, [ [ low_range, high_range, attack_name ], ... ] ]
     # This code evaulates that chance, and chooses an actual result based on it
@@ -702,9 +752,9 @@ class Monster:
       for i in result[1]:
         if ( i[0] <= temp_rand <= i[1] ):
           if player_turn:
-            result = self.P_TURN_RESULTS[ f'{ self.name } : { p } : { self.MONSTER_DODGES[ self.name ][ self.move ] } : { i[2] }' ]
+            result = self.P_TURN_RESULTS[ f'{self.name} : {p} : {self.MONSTER_DODGES[ self.name ][ self.move ]} : {i[2]}' ]
           else:
-            result = self.M_TURN_RESULTS[ f'{ self.name } : { p } : { self.MONSTER_ATTACKS[ self.name ][ self.move ] } : { i[2] }' ]
+            result = self.M_TURN_RESULTS[ f'{self.name} : {p} : {self.MONSTER_ATTACKS[ self.name ][ self.move ]} : {i[2]}' ]
           break
       else:
         print( "ERROR: Random values don't add up to 100." )
@@ -736,16 +786,16 @@ class Monster:
     # Display text
     print( '[!] ' + result[0] )
     if dmg_amount == 0:
-      print( f"[*] { 'Enemy' if result[2] == 'e' else 'You' }: NO DAMAGE"  )
+      print( f"[*] {'Enemy' if result[2] == 'e' else 'You'}: NO DAMAGE"  )
     elif dmg_amount != 0:
-      print( f"[*] { 'Enemy' if result[2] == 'e' else 'You' }: -{ dmg_amount } HP"  )
+      print( f"[*] {'Enemy' if result[2] == 'e' else 'You'}: -{dmg_amount} HP"  )
 
     # Change HP/Display text for special moves
     self.charged = ( 'c' in result[2] )
     if self.charged:
       print( '[*] Enemy: +50% DMG next turn' )
     if 'h' in result[2]:
-      print( f'[*] Enemy: +{ -self.damage( -10, -1 ) } HP' )
+      print( f'[*] Enemy: +{-self.damage( -10, -1 )} HP' )
 
     # Remove item
 
@@ -756,24 +806,24 @@ class Monster:
     self.advance_move()
 
   # Checks if either entity has died
-  def hp_check( self ):
+  async def hp_check( self ):
 
     # If player won
     if self.hp <= 0:
       print_line()
-      print( f"[!] { self.name.replace( '_', ' ' ).title() } was killed." )
+      print( f"[!] {self.name.replace( '_', ' ' ).title()} was killed." )
       self.give_items()
-      input( '[!] Press enter to exit the fight. ' )
+      await input( '[!] Press enter to exit the fight. ' )
       goto_room( room_scene )
 
     # If player lost
     if g_hp <= 0:
       print_line()
-      print( f"[!] { self.name.replace( '_', ' ' ).title() } won." )
-      input( '[!] Press enter to exit the fight. ' )
+      print( f"[!] {self.name.replace( '_', ' ' ).title()} won." )
+      await input( '[!] Press enter to exit the fight. ' )
       goto_room( room_death )
 
-  def give_items( self ):
+  async def give_items( self ):
 
     # Stores all the items the player will receive
     temp_items = []
@@ -794,25 +844,25 @@ class Monster:
       print( '[!] You received nothing.' )
 
     if len( temp_items ) == 1:
-      print( f'[!] You received { temp_items[0][1] }x { item_meta( temp_items[0][0] ) }.' )
+      print( f'[!] You received {temp_items[0][1]}x {item_meta( temp_items[0][0] )}.' )
       update_inv( temp_items[0][0], temp_items[0][1] )
 
     elif len( temp_items ) == 2:
-      print( f'[!] You received { temp_items[0][1] }x { item_meta( temp_items[0][0] ) } ', end = '' )
-      print( f'and { temp_items[1][1] }x { item_meta( temp_items[1][0] ) }.' )
+      print( f'[!] You received {temp_items[0][1]}x {item_meta( temp_items[0][0] )} ', end = '' )
+      print( f'and {temp_items[1][1]}x {item_meta( temp_items[1][0] )}.' )
       update_inv( temp_items[0][0], temp_items[0][1] )
       update_inv( temp_items[1][0], temp_items[1][1] )
 
     else:
-      print( f'[!] You received { temp_items[0][1] }x { item_meta( temp_items[0][0] ) }, ', end = '' )
+      print( f'[!] You received {temp_items[0][1]}x {item_meta( temp_items[0][0] )}, ', end = '' )
       update_inv( temp_items[0][0], temp_items[0][1] )
       for i in temp_items[1:-1]:
-        print( f'{ i[1] }x { item_meta( i[0] ) }, ', end = '' )
+        print( f'{i[1]}x {item_meta( i[0] )}, ', end = '' )
         update_inv( i[0], i[1] )
-      print( f'and { temp_items[-1][1] }x { item_meta( temp_items[-1][0] ) }.' )
+      print( f'and {temp_items[-1][1]}x {item_meta( temp_items[-1][0] )}.' )
       update_inv( temp_items[-1][0], temp_items[-1][1] )
 
-  def advance_move( self ):
+  async def advance_move( self ):
 
     # If you're trying to find each enemy's attack pattern,
     # this is where you want to look
@@ -865,9 +915,9 @@ class EyeOfCthulhu( Monster ):
   # Determines the damage each weapon does
   # (Can't have it defined for each possible outcome like in the base class b/c
   # there's too many possible outcomes, so it's only defined for each weapon type)
-  DAMAGE_RANGES = { 's': ( 8, 16 ), 'b': ( 6, 12 ), 'g': ( 24, 48 ) }
+  DAMAGE_RANGES = {'s': ( 8, 16 ), 'b': ( 6, 12 ), 'g': ( 24, 48 )}
 
-  def __init__( self ):
+  async def __init__( self ):
 
     self.hp = 2048
 
@@ -879,7 +929,7 @@ class EyeOfCthulhu( Monster ):
 
     self.charged = False
 
-  def get_options( self, player_turn, should_print = True ):
+  async def get_options( self, player_turn, should_print = True ):
 
     self.update_stats() # Query weapon, armor, etc.
 
@@ -901,20 +951,20 @@ class EyeOfCthulhu( Monster ):
 
         suffix = ''
         if len( s ) > 2 and s[2] == 's':
-          suffix += f"({ ( 'Copper Shortsword', 'Iron Broadsword', 'Silver Broadsword', 'Gold Broadsword', 'Magic Staff' )[ ( 'copper', 'iron', 'silver', 'gold', 'staff' ).index( self.weapon_melee ) ] })"
+          suffix += f"({( 'Copper Shortsword', 'Iron Broadsword', 'Silver Broadsword', 'Gold Broadsword', 'Magic Staff' )[ ( 'copper', 'iron', 'silver', 'gold', 'staff' ).index( self.weapon_melee ) ]})"
         if len( s ) > 2 and s[2] == 'b':
-          suffix += f"({ ( 'Bow', 'Iron Bow', 'Silver Bow', 'Gold Bow' )[ ( 'wood', 'iron', 'silver', 'gold' ).index( self.weapon_bow[0] ) ] } + "
-          suffix += f"{ ( 'Arrow', 'Flaming Arrow' )[ ( 'arrow', 'flame_arrow' ).index( self.weapon_bow[1] ) ] } x"
-          suffix += f"{ update_inv( ( I_ARROW, I_F_ARROW )[ ( 'arrow', 'flame_arrow' ).index( self.weapon_bow[1] ) ], 0, mode = 't' ) })"
+          suffix += f"({( 'Bow', 'Iron Bow', 'Silver Bow', 'Gold Bow' )[ ( 'wood', 'iron', 'silver', 'gold' ).index( self.weapon_bow[0] ) ]} + "
+          suffix += f"{( 'Arrow', 'Flaming Arrow' )[ ( 'arrow', 'flame_arrow' ).index( self.weapon_bow[1] ) ]} x"
+          suffix += f"{update_inv( ( I_ARROW, I_F_ARROW )[ ( 'arrow', 'flame_arrow' ).index( self.weapon_bow[1] ) ], 0, mode = 't' )})"
         if len( s ) > 2 and s[2] == 'g':
-          suffix += f"(Grenade x{ update_inv( I_GRENADE, 0, mode = 't' ) })"
+          suffix += f"(Grenade x{update_inv( I_GRENADE, 0, mode = 't' )})"
 
-        print( f'[{ s[0].upper() }] { s[1] } { suffix }' )
+        print( f'[{s[0].upper()}] {s[1]} {suffix}' )
       options_list.append( s[0].lower() )
 
     return options_list
   
-  def turn( self, p, player_turn ):
+  async def turn( self, p, player_turn ):
 
     # Loop through each attack
     for i in range( 3 ):
@@ -980,12 +1030,12 @@ class EyeOfCthulhu( Monster ):
         attack_angle = [ j for j in self.PLAYER_ATTACKS if j[0] == p[i] ][0][3]
         if attack_angle == self.angle and has_item:
           if p[i] == 's' and random.choice( ( True, False ) ):
-            print( f'[!] The enemy flew { temp_dir }, and you barely missed it.' )
+            print( f'[!] The enemy flew {temp_dir}, and you barely missed it.' )
           else:
-            print( f'[!] The enemy flew { temp_dir }, and you hit it.' )
+            print( f'[!] The enemy flew {temp_dir}, and you hit it.' )
             dmg_amount = self.damage( *self.DAMAGE_RANGES[ dmg_method ], entity = 'self', method = dmg_method )
         elif has_item:
-          print( f'[!] The enemy flew { temp_dir }, so your attack missed.' )
+          print( f'[!] The enemy flew {temp_dir}, so your attack missed.' )
         else:
           print( f'[!] You ran out of the weapon necessary to perform this attack.' )
 
@@ -998,12 +1048,12 @@ class EyeOfCthulhu( Monster ):
         dodge_angle = [ j for j in self.PLAYER_DODGES if j[0] == p[i] ][0][3]
 
         if self.angle != -1 and dodge_angle != -1 and self.angle % 2 != dodge_angle:
-          print( f'The enemy charged { temp_dir }, and you dodged it by { temp_move }.' )
+          print( f'The enemy charged {temp_dir}, and you dodged it by {temp_move}.' )
         elif self.angle != -1 and dodge_angle != -1:
-          print( f'The enemy charged { temp_dir } and hit you.' )
+          print( f'The enemy charged {temp_dir} and hit you.' )
           dmg_amount = self.damage( 40, 100, entity = 'you', method = dmg_method )
         elif self.angle != -1 and dodge_angle == -1:
-          print( f'The enemy charged { temp_dir }, and your grenade didn\'t counter its attack.' )
+          print( f'The enemy charged {temp_dir}, and your grenade didn\'t counter its attack.' )
           dmg_amount = self.damage( 40, 100, entity = 'you', method = dmg_method )
         elif self.angle == -1 and dodge_angle != -1:
           print( f'The enemy sent two Servants of Cthulhu after you, and you only dodged one of them.' )
@@ -1018,56 +1068,56 @@ class EyeOfCthulhu( Monster ):
 
       # Display text
       if dmg_amount == 0:
-        print( f"[*] { 'Boss' if player_turn else 'You' }: NO DAMAGE"  )
+        print( f"[*] {'Boss' if player_turn else 'You'}: NO DAMAGE"  )
       elif dmg_amount != 0:
-        print( f"[*] { 'Boss' if player_turn else 'You' }: -{ dmg_amount } HP"  )
+        print( f"[*] {'Boss' if player_turn else 'You'}: -{dmg_amount} HP"  )
 
       # Check if fight is over
       self.hp_check()
 
       # Wait
-      time.sleep( 0.5 )
+      await sleep( 0.5 )
 
     # Advance move
     self.advance_move()
 
   # Checks if either entity has died
-  def hp_check( self ):
+  async def hp_check( self ):
 
     if self.hp <= 0:
       print_line()
       print( f"[!] Eye of Cthulhu was killed." )
-      input( '[!] Press enter to exit the fight. ' )
+      await input( '[!] Press enter to exit the fight. ' )
       goto_room( room_scene )
 
     if g_hp <= 0:
       print_line()
       print( f"[!] Eye of Cthulhu won." )
-      input( '[!] Press enter to exit the fight. ' )
+      await input( '[!] Press enter to exit the fight. ' )
       goto_room( room_death )
 
-  def advance_move( self ):
+  async def advance_move( self ):
 
     self.move_c += 1
     self.move[0] = ( self.move[0] + ( 2 if self.move_c % 2 else 3 ) ) % 4
     self.move[1] = list( 'bca' )[ list( 'abc' ).index( self.move[1] ) ]
 
 # Switches rooms
-def goto_room( room, arg = '' ):
+async def goto_room( room, arg = '' ):
   raise MoveException( room, arg )
 
 # Prints line
-def print_line():
+async def print_line():
   print( '- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -' )
 
 # Prints the worldgen progress
 # I don't think it's important to explain what the arguments do
-def print_progress( prog, div_this, div_total, s ):
+async def print_progress( prog, div_this, div_total, s ):
 
   prog += ( 1 / div_this ) * ( div_total / 2 ) # Add to progress
-  suffix = f'{ int( prog * 2 ) }% ' if prog < 50 else 'Done!' # Create a suffix that contains the progress/current task
+  suffix = f'{int( prog * 2 )}% ' if prog < 50 else 'Done!' # Create a suffix that contains the progress/current task
   if prog < 50:
-    suffix += f'({ s })'
+    suffix += f'({s})'
   if SHOW_PROG:
     print( '[' + ( '|' * int( prog ) ) + ( '-' * ( 50 - int( prog ) ) ) + ']  ' + suffix + ( ' ' * 30 ), end = '\r' )
   return prog
@@ -1075,7 +1125,7 @@ def print_progress( prog, div_this, div_total, s ):
 # A function used for the top of the world
 # (A really interesting bug came up when I was integrating this function into worldgen,
 # so I may or may not make a supplemental video dedicated to explaining it)
-def noise_top( x, seed ):
+async def noise_top( x, seed ):
 
   next_seed = random.randint( 1, 10 ** 12 )
   random.seed( seed )
@@ -1087,7 +1137,7 @@ def noise_top( x, seed ):
 
 # Allow time to move forward a little bit
 # Includes gravity, monster movements, etc.
-def tick( nofall = False ):
+async def tick( nofall = False ):
 
   global g_pos, g_hp, g_hp_max, g_enemy_timer
 
@@ -1112,7 +1162,7 @@ def tick( nofall = False ):
 
 # Modify the inventory
 # Modes = pickup, remove, or set
-def update_inv( item_id, amount, mode = 'p', slot = 0, allow_stash = True ):
+async def update_inv( item_id, amount, mode = 'p', slot = 0, allow_stash = True ):
 
   global g_items, g_items_extra
 
@@ -1207,15 +1257,15 @@ def update_inv( item_id, amount, mode = 'p', slot = 0, allow_stash = True ):
   data_save()
 
 # Create new (empty) chest
-def chest_create( x, y ):
+async def chest_create( x, y ):
 
   global g_tile_special
 
-  g_tile_special[ f'{ x } : { y }' ] = {}
+  g_tile_special[ f'{x} : {y}' ] = {}
   for i in range( 10 ):
-    g_tile_special[ f'{ x } : { y }' ][ f'slot{ i }' ] = '0:0'
+    g_tile_special[ f'{x} : {y}' ][ f'slot{i}' ] = '0:0'
 
-def chest_modify( x, y, item_id, amount, mode = 'i' ):
+async def chest_modify( x, y, item_id, amount, mode = 'i' ):
 
   global g_tile_special
   
@@ -1257,20 +1307,20 @@ def chest_modify( x, y, item_id, amount, mode = 'i' ):
     # Failed to remove
     return 0
 
-def chest_remove( x, y ):
+async def chest_remove( x, y ):
 
   global g_tile_special
 
-  g_tile_special.pop( f'{ x } : { y }' )
+  g_tile_special.pop( f'{x} : {y}' )
 
-def chest_slot( x, y, s, a = 0, amount = False, op = '?' ):
+async def chest_slot( x, y, s, a = 0, amount = False, op = '?' ):
 
   global g_tile_special
 
   if op == '?':
-    return int( g_tile_special[ f'{ x } : { y }' ][ f'slot{ s }' ].split( ':' )[ 1 if amount else 0 ] )
+    return int( g_tile_special[ f'{x} : {y}' ][ f'slot{s}' ].split( ':' )[ 1 if amount else 0 ] )
 
-  values = g_tile_special[ f'{ x } : { y }' ][ f'slot{ s }' ].split( ':' )
+  values = g_tile_special[ f'{x} : {y}' ][ f'slot{s}' ].split( ':' )
   values = [ int( values[0] ), int( values[1] ) ]
 
   if op == '=':
@@ -1278,10 +1328,10 @@ def chest_slot( x, y, s, a = 0, amount = False, op = '?' ):
   elif op in ( '+', '-' ):
     values[ 1 if amount else 0 ] += a * ( 1 if op == '+' else -1 )
 
-  g_tile_special[ f'{ x } : { y }' ][ f'slot{ s }' ] = f'{ values[0] }:{ values[1] }'
+  g_tile_special[ f'{x} : {y}' ][ f'slot{s}' ] = f'{values[0]}:{values[1]}'
 
 # Break a block
-def break_block( x, y, ignore_tree = False ):
+async def break_block( x, y, ignore_tree = False ):
 
   global g_tile_data, g_tile_special
 
@@ -1294,18 +1344,18 @@ def break_block( x, y, ignore_tree = False ):
   g_tile_data[ xy2c( x, y, g_world_size.x ) ] = ' '
 
   # If the block is part of a tree
-  if not ignore_tree and old_value in ( 'l', 'L' ) and 'type' in g_tile_special[ f'{ x } : { y }' ]:
+  if not ignore_tree and old_value in ( 'l', 'L' ) and 'type' in g_tile_special[ f'{x} : {y}' ]:
 
     # Copy the tile positions from the root
     tile_positions = []
-    if g_tile_special[ f'{ x } : { y }' ][ 'type' ] == 'root':
+    if g_tile_special[ f'{x} : {y}' ][ 'type' ] == 'root':
       root_pos = V2( x, y )
-      for i in g_tile_special[ f'{ x } : { y }' ][ 'links' ].split( ',,' ):
+      for i in g_tile_special[ f'{x} : {y}' ][ 'links' ].split( ',,' ):
         tile_positions.append( V2( int( i.split( ',' )[0] ), int( i.split( ',' )[1] ) ) )
     else:
-      root_pos = g_tile_special[ f'{ x } : { y }' ][ 'root' ]
+      root_pos = g_tile_special[ f'{x} : {y}' ][ 'root' ]
       root_pos = V2( int( root_pos.split( ',' )[0] ), int( root_pos.split( ',' )[1] ) )
-      for i in g_tile_special[ f"{ root_pos.x } : { root_pos.y }" ][ 'links' ].split( ',,' ):
+      for i in g_tile_special[ f"{root_pos.x} : {root_pos.y}" ][ 'links' ].split( ',,' ):
         tile_positions.append( V2( int( i.split( ',' )[0] ), int( i.split( ',' )[1] ) ) )
 
     # Remove branches that are above the one broken
@@ -1323,12 +1373,12 @@ def break_block( x, y, ignore_tree = False ):
     if get_tile( *root_pos.l() ) == 'l':
       tile_strings = []
       for pos in tile_positions:
-        tile_strings.append( f'{ pos.x },{ pos.y }' )
-      g_tile_special[ f'{ root_pos.x } : { root_pos.y }' ][ 'links' ] = ',,'.join( tile_strings )
+        tile_strings.append( f'{pos.x},{pos.y}' )
+      g_tile_special[ f'{root_pos.x} : {root_pos.y}' ][ 'links' ] = ',,'.join( tile_strings )
 
   # Remove special data if necessary
-  if f'{ x } : { y }' in g_tile_special:
-    g_tile_special.pop( f'{ x } : { y }' )
+  if f'{x} : {y}' in g_tile_special:
+    g_tile_special.pop( f'{x} : {y}' )
 
   data_save() # Save data
 
@@ -1336,7 +1386,7 @@ def break_block( x, y, ignore_tree = False ):
   return old_value
 
 # Place a block
-def place_block( x, y ):
+async def place_block( x, y ):
 
   global g_tile_data
 
@@ -1361,7 +1411,7 @@ def place_block( x, y ):
   return False
 
 # This function exists to reduce code repetition
-def try_break_block( x, y ):
+async def try_break_block( x, y ):
 
   # Check whether the player is holding a pickaxe
 
@@ -1372,7 +1422,7 @@ def try_break_block( x, y ):
 
   # Not holding pickaxe
   elif g_items[ g_slot ][0] != 2:
-    print( f'[!] Item "{ item_meta( g_slot, c = 1 ) }" cannot break blocks!' )
+    print( f'[!] Item "{item_meta( g_slot, c = 1 )}" cannot break blocks!' )
     goto_room( room_scene, '1' )
 
   # Holding pickaxe
@@ -1393,7 +1443,7 @@ def try_break_block( x, y ):
 
 # This function also exists to reduce code repetition
 # (even though it's pretty much just an inverse of the above function)
-def try_place_block( x, y ):
+async def try_place_block( x, y ):
 
   # Check whether the player is holding a block
 
@@ -1404,7 +1454,7 @@ def try_place_block( x, y ):
 
   # Not holding a block
   elif g_items[ g_slot ][0] not in ITEM_BLOCKS.values():
-    print( f'[!] Item "{ item_meta( g_slot, c = 1 ) }" is not placeable!' )
+    print( f'[!] Item "{item_meta( g_slot, c = 1 )}" is not placeable!' )
     goto_room( room_scene, '1' )
 
   # Holding a block
@@ -1423,7 +1473,7 @@ def try_place_block( x, y ):
     tick()
     goto_room( room_scene ) # We can now reload the room
 
-def try_fight():
+async def try_fight():
 
   temp_rand = random.randint( 1, 100 ) # Used for deciding which enemy is encountered
 
@@ -1449,17 +1499,17 @@ def try_fight():
     elif ( temp_rand < 95 ): start_fight( 'skeleton' )
     else: start_fight( 'tim' )
 
-def start_fight( monster_id ):
+async def start_fight( monster_id ):
   
   global g_monster
   g_monster = Monster( monster_id )
   
   print_line()
-  input( f"You encountered a { g_monster.name.replace( '_', ' ' ).title() }! " )
+  await input( f"You encountered a {g_monster.name.replace( '_', ' ' ).title()}! " )
   
   goto_room( room_fight )
 
-def start_bossfight():
+async def start_bossfight():
 
   global g_monster
   g_monster = EyeOfCthulhu()
@@ -1467,19 +1517,19 @@ def start_bossfight():
   print_line()
   for c in 'Eye of Cthulhu has awoken!':
     print( c, end = '', flush = True )
-    time.sleep( 0.08 )
-  time.sleep( 2 )
+    await sleep( 0.08 )
+  await sleep( 2 )
   print()
 
   goto_room( room_bossfight )
 
 # Initialize the data file if it doesn't exist
-def data_main_init():
+async def data_main_init():
 
   # I don't actually think I need to put anything here
   pass
 
-def data_char_init( name ):
+async def data_char_init( name ):
 
   global g_hp, g_hp_max, g_items, g_items_extra
 
@@ -1492,7 +1542,7 @@ def data_char_init( name ):
     g_items.append( [ 0, 0 ] )
   g_items_extra = []
 
-def generate_world( size, seed ):
+async def generate_world( size, seed ):
 
   # WORLDGEN PARAMETERS
   CAVES = True
@@ -1646,8 +1696,8 @@ def generate_world( size, seed ):
           # Place down a log and move vector upward (also save special tile data)
           g_tile_data[ xy2c( o.x, o.y, size.x ) ] = 'l'
           if o.l() != root.l():
-            g_tile_special[ str( o.x ) + " : " + str( o.y ) ] = { 'type': 'tile', 'root': f'{ root.x },{ root.y }' }
-            root_links.append( f'{ o.x },{ o.y }' )
+            g_tile_special[ str( o.x ) + " : " + str( o.y ) ] = {'type': 'tile', 'root': f'{root.x},{root.y}'}
+            root_links.append( f'{o.x},{o.y}' )
           o.y -= 1
 
           # Decide whether the tree should sway a little
@@ -1662,11 +1712,11 @@ def generate_world( size, seed ):
           for i in range( o.x - 4, o.x + 4 ):
             if random.randint( 0, int( dist( V2( i, j ), o ) ) ) <= 1:
               g_tile_data[ xy2c( i, j, size.x ) ] = 'L'
-              g_tile_special[ str( i ) + " : " + str( j ) ] = { 'type': 'stem', 'root': f'{ root.x },{ root.y }' }
-              root_links.append( f'{ i },{ j }' )
+              g_tile_special[ str( i ) + " : " + str( j ) ] = {'type': 'stem', 'root': f'{root.x},{root.y}'}
+              root_links.append( f'{i},{j}' )
 
         # Create root data now that the tree's tile positions have been recorded 
-        g_tile_special[ str( root.x ) + " : " + str( root.y ) ] = { 'type': 'root', 'links': ',,'.join( root_links ) }
+        g_tile_special[ str( root.x ) + " : " + str( root.y ) ] = {'type': 'root', 'links': ',,'.join( root_links )}
 
       # Choose how far to move before creating another tree
       i1 += int( random.randint( 8, 15 ) * random.choice( ( 0.6, 1, 1, 4 ) ) )
@@ -1763,7 +1813,7 @@ def generate_world( size, seed ):
   print() # Newline
 
 # Initialize a world file upon creation
-def data_world_init( name, seed ):
+async def data_world_init( name, seed ):
 
   global g_pos, g_spawn, g_world_size, g_seed, g_tile_data, g_tile_special, g_show_help, g_slot, g_versions, g_play_time_last, g_enemy_timer
 
@@ -1771,10 +1821,40 @@ def data_world_init( name, seed ):
   g_world_size = V2( 400, 200 )
   generate_world( g_world_size, seed )
 
-def data_save():
-  pass
+async def data_save():
+  
+  global g_data
+  
+  g_data = ''
+  
+  g_data += 'version: 1.0\n'
+  g_data += f'cname: {g_cname}\nwname: {g_wname}\n'
+  
+  g_data += f'hp: {g_hp},{g_hp_max}\n'
+  g_data += 'items: '
+  for i in range( 16 ):
+    g_data += f'{g_items[i][0]}:{g_items[i][1]}' + ( ',' if i != 15 else '' )
+  g_data += '\nextra_items: '
+  for i in range( len( g_items_extra ) ):
+    g_data += f'{g_items_extra[i][0]}:{g_items_extra[i][1]}' + ( ',' if i != len( g_items_extra ) - 1 else '' )
+  
+  g_data += f'\nsize: {g_world_size.x},{g_world_size.y}\n'
+  g_data += f'seed: {g_seed}\n'
+  g_data += f'player_pos: {g_pos.x},{g_pos.y}\n'
+  g_data += f'spawnpoint: {g_spawn.x},{g_spawn.y}\n'
+  for j in range( g_world_size.y ):
+    g_data += ''.join( g_tile_data[ ( j * g_world_size.x ):( ( j + 1 ) * g_world_size.x ) ] )
+    g_data += '\n'
+  for t in g_tile_special:
+    g_data += 'S' + t.replace( ' ', '' ) + ': '
+    special_data_keys = []
+    for k in g_tile_special[t]:
+      special_data_keys.append( f'{k};{g_tile_special[t][k]}' )
+    g_data += ';;'.join( special_data_keys ) + '\n'
+  
+  open( 'test.txt', 'w' ).write( g_data )
 
-def room_menu():
+async def room_menu():
   
   global g_cname, g_wname
 
@@ -1799,7 +1879,7 @@ def room_menu():
   
   # Keep looping until a valid input is provided
   while True:
-    p = input( '> ' ).lower()
+    p = await input( '> ' ).lower()
 
     # Play
     if p == 'p':
@@ -1818,20 +1898,20 @@ def room_menu():
       print( '[#] Unknown command.' )
 
 # Character selection room
-def room_char_select():
+async def room_char_select():
 
   global g_cname
 
   # Print options
   print_line()
-  print( f'Character: { g_cname }' )
+  print( f'Character: {g_cname}' )
   print( '[C] Continue' )
   print( '[R] Reset' )
   print( '[Q] Back' )
 
   while True:
 
-    p = input( '> ' ).lower()
+    p = await input( '> ' ).lower()
 
     # Continue character
     if p == 'c':
@@ -1848,9 +1928,9 @@ def room_char_select():
     elif p == 'r':
 
       # Make sure they actually want to
-      print( f'Are you sure you want to reset character "{ g_cname }"?' )
+      print( f'Are you sure you want to reset character "{g_cname}"?' )
       print( 'Type "yes" to proceed.' )
-      if input( '> ' ).lower() == 'yes':
+      if await input( '> ' ).lower() == 'yes':
 
         # Delete character file and create new
         g_cname = ''
@@ -1864,7 +1944,7 @@ def room_char_select():
         print( '[#] Unknown command.' )
 
 # Character creation room
-def room_char_create():
+async def room_char_create():
 
   global g_cname
 
@@ -1872,7 +1952,7 @@ def room_char_create():
   print_line()
   print( 'Enter a character name:' )
   while True:
-    name = input( '> ' )
+    name = await input( '> ' )
 
     # Check length
     if not ( 0 < len( name ) <= 64 ):
@@ -1885,20 +1965,20 @@ def room_char_create():
       goto_room( room_char_select )
 
 # World selection room
-def room_world_select():
+async def room_world_select():
 
   global g_wname
 
   # Print options
   print_line()
-  print( f'World: { g_wname }' )
+  print( f'World: {g_wname}' )
   print( '[C] Continue' )
   print( '[R] Reset' )
   print( '[Q] Back' )
 
   while True:
 
-    p = input( '> ' ).lower()
+    p = await input( '> ' ).lower()
 
     # Create world
     if p == 'c':
@@ -1912,9 +1992,9 @@ def room_world_select():
     elif p == 'r':
 
       # Make sure they actually want to
-      print( f'Are you sure you want to reset world "{ g_wname }"?' )
+      print( f'Are you sure you want to reset world "{g_wname}"?' )
       print( 'Type "yes" to proceed.' )
-      if input( '> ' ).lower() == 'yes':
+      if await input( '> ' ).lower() == 'yes':
 
         # Delete world file and create new
         g_wname = ''
@@ -1928,7 +2008,7 @@ def room_world_select():
       print( '[#] Unknown command.' )
 
 # World creation room
-def room_world_create():
+async def room_world_create():
 
   global g_wname
 
@@ -1936,7 +2016,7 @@ def room_world_create():
   print_line()
   print( 'Enter a world name:' )
   while True:
-    name = input( '> ' )
+    name = await input( '> ' )
 
     # Check length
     if not ( 0 < len( name ) <= 16 ):
@@ -1950,7 +2030,7 @@ def room_world_create():
   # Get seed
   print( 'Enter a world seed (blank = random):' )
   while True:
-    seed = list( input( '> ' ).lower() )
+    seed = list( await input( '> ' ).lower() )
 
     # Numerify seed
     # The seed needs to be a number, but instead of deleting all non-digit characters,
@@ -1975,7 +2055,7 @@ def room_world_create():
 #
 # WORLD SCENE ROOM
 #
-def room_scene( arg = '' ):
+async def room_scene( arg = '' ):
 
   global g_pos, g_view, g_tile_data, g_show_help, g_slot, g_monster, g_hp, g_hp_max
 
@@ -1993,8 +2073,8 @@ def room_scene( arg = '' ):
 
     # Print important data (HP, item)
     print_line()
-    print( f'HP: { g_hp }/{ g_hp_max }' )
-    print( f'ITEM: { item_meta( g_slot, c = 1 ) if g_items[ g_slot ][1] > 0 else "..." }' )
+    print( f'HP: {g_hp}/{g_hp_max}' )
+    print( f'ITEM: {item_meta( g_slot, c = 1 ) if g_items[ g_slot ][1] > 0 else "..."}' )
     print()
 
     # Display world
@@ -2015,10 +2095,10 @@ def room_scene( arg = '' ):
       g_show_help = False
 
   while True:
-    p = input( '> ' )
+    p = await input( '> ' )
     parse_scene_cmd( p )
 
-def parse_scene_cmd( cmd ):
+async def parse_scene_cmd( cmd ):
 
   global g_pos, g_view, g_tile_data, g_show_help, g_slot, g_monster, g_hp, g_hp_max
 
@@ -2120,7 +2200,7 @@ def parse_scene_cmd( cmd ):
       print( '[?] Syntax: $ execute <code>' )
       print( '[?] Effect: Sends code to the Python interpreter.' )
     else:
-      print( f'[#] Unknown command "{ p[2:] }".' )
+      print( '[#] Unknown command "' + p[2:] + '".' )
 
   # Pause game
   elif p == '*':
@@ -2241,7 +2321,7 @@ def parse_scene_cmd( cmd ):
 
       # Select slot
       g_slot = list( '1234567890abcdef' ).index( p[2:] )
-      print( f'[!] Selected "{ item_meta( g_slot, c = 1 ) }".' if g_items[ g_slot ][1] > 0 else '[!] Cleared selection.' )
+      print( f'[!] Selected "{item_meta( g_slot, c = 1 )}".' if g_items[ g_slot ][1] > 0 else '[!] Cleared selection.' )
       goto_room( room_scene )
 
   # Use
@@ -2266,7 +2346,7 @@ def parse_scene_cmd( cmd ):
 
       elif g_items[ g_slot ][ 0 ] == I_HEALTH_POTION:
         update_inv( I_HEALTH_POTION, 1, 'r' )
-        print( f'[!] You used a healing potion. (+{ min( g_hp + 100, g_hp_max ) - g_hp } HP)' )
+        print( f'[!] You used a healing potion. (+{min( g_hp + 100, g_hp_max ) - g_hp} HP)' )
         g_hp = min( g_hp + 100, g_hp_max )
         goto_room( room_scene )
 
@@ -2302,7 +2382,7 @@ def parse_scene_cmd( cmd ):
 
       if p[0] == 'z' and p[2] in ( 'l', 'r' ):
 
-        parse_scene_cmd( f'm { p[2:] }' )
+        parse_scene_cmd( f'm ' + p[2:] )
       goto_room( room_scene )
 
     # If not, then the z command would have invalid arguments
@@ -2325,7 +2405,7 @@ def parse_scene_cmd( cmd ):
         x_in_bounds = ( -4 <= p[0] <= 4 )
         y_in_bounds = ( -4 <= p[1] <= 4 )
         if not ( x_in_bounds and y_in_bounds ):
-          print( f"[#] { '' if x_in_bounds else 'X' }{ '' if x_in_bounds or y_in_bounds else ' and ' }{ '' if y_in_bounds else 'Y' } coordinate{ '' if x_in_bounds or y_in_bounds else 's' } out of range. (Valid range: [-4, 4])" )
+          print( f"[#] {'' if x_in_bounds else 'X'}{'' if x_in_bounds or y_in_bounds else ' and '}{'' if y_in_bounds else 'Y'} coordinate{'' if x_in_bounds or y_in_bounds else 's'} out of range. (Valid range: [-4, 4])" )
 
         # If both coordinates are valid, then continue onward
         if x_in_bounds and y_in_bounds:
@@ -2357,7 +2437,7 @@ def parse_scene_cmd( cmd ):
         x_in_bounds = ( -4 <= chest_coords.x <= 4 )
         y_in_bounds = ( -4 <= chest_coords.y <= 4 )
         if not ( x_in_bounds and y_in_bounds ):
-          print( f"[#] { '' if x_in_bounds else 'X' }{ '' if x_in_bounds or y_in_bounds else ' and ' }{ '' if y_in_bounds else 'Y' } coordinate{ '' if x_in_bounds or y_in_bounds else 's' } out of range. (Valid range: [-4, 4])" )
+          print( f"[#] {'' if x_in_bounds else 'X'}{'' if x_in_bounds or y_in_bounds else ' and '}{'' if y_in_bounds else 'Y'} coordinate{'' if x_in_bounds or y_in_bounds else 's'} out of range. (Valid range: [-4, 4])" )
           chest_coords = 'ERROR'
 
     # Else default to (0, 0)
@@ -2372,7 +2452,7 @@ def parse_scene_cmd( cmd ):
 
       # Success
       else:
-        goto_room( room_chest, f'0,{ g_pos.copy().a( chest_coords ).x },{ g_pos.copy().a( chest_coords ).y }' )
+        goto_room( room_chest, f'0,{g_pos.copy().a( chest_coords ).x},{g_pos.copy().a( chest_coords ).y}' )
 
   # Debug command (requires debug mode)
   elif p == '$' and DEBUG:
@@ -2401,7 +2481,7 @@ def parse_scene_cmd( cmd ):
         else:
           g_pos = dest_coords
           data_save()
-          print( f'[!] Moved player to ({ dest_coords.x }, { dest_coords.y })' )
+          print( f'[!] Moved player to ({dest_coords.x}, {dest_coords.y})' )
           goto_room( room_scene )
 
     # Give/remove item
@@ -2425,10 +2505,10 @@ def parse_scene_cmd( cmd ):
 
           if p[2] == 'g':
             exec( 'update_inv( ' + item_info[0] + ', item_info[1] )' )
-            exec( 'print( f\'[!] Gave you "{ item_meta( ' + item_info[0] + ' ) }" x{ item_info[1] }\' )' )
+            exec( 'print( f\'[!] Gave you "{item_meta( ' + item_info[0] + ' )}" x{item_info[1]}\' )' )
           else:
             exec( 'amount_removed = update_inv( ' + item_info[0] + ', item_info[1], mode = \'r\' )' )
-            exec( 'print( f\'[!] Removed "{ item_meta( ' + item_info[0] + ' ) }" x{ amount_removed }\' )' )
+            exec( 'print( f\'[!] Removed "{item_meta( ' + item_info[0] + ' )}" x{amount_removed}\' )' )
           goto_room( room_scene )
         except Exception:
           print( '[#] Invalid item ID.' )
@@ -2458,7 +2538,7 @@ def parse_scene_cmd( cmd ):
         else:
           g_tile_data[ xy2c( *block_coords.l(), g_world_size.x ) ] = p_def[ 6: ].split( ' ' )[2]
           data_save()
-          print( f"[!] Set block to ID '{ p_def[ 6: ].split( ' ' )[2] }'" )
+          print( "[!] Set block to ID '" + p_def[ 6: ].split( ' ' )[2] + "'" )
           goto_room( room_scene )
 
     # Fight monster
@@ -2492,7 +2572,7 @@ def parse_scene_cmd( cmd ):
   return False
 
 # Inventory Room
-def room_inventory( arg = "" ):
+async def room_inventory( arg = "" ):
 
   global g_items_extra
 
@@ -2504,9 +2584,9 @@ def room_inventory( arg = "" ):
     print( 'Inventory:' )
     for i in range( 16 ):
       j = i // 2 + ( i % 2 ) * 8
-      item_string = f"({ '1234567890ABCDEF'[j] }) "
+      item_string = f"({'1234567890ABCDEF'[j]}) "
       item_string += ( '* ' if g_slot == j else '' ) + ( item_meta( j, c = 1 ) if g_items[j][1] != 0 else '...' )
-      item_string += f"  x{ g_items[j][1] }" if g_items[j][1] != 0 else ''
+      item_string += f"  x{g_items[j][1]}" if g_items[j][1] != 0 else ''
       item_string = item_string[:38]
       print( item_string + ' ' * ( 40 - len( item_string ) ), end = ( '' if j < 8 else '\n' ) )
     print()
@@ -2516,7 +2596,7 @@ def room_inventory( arg = "" ):
       extra_item_amount = 0
       for i in g_items_extra:
         extra_item_amount += i[1]
-      print( f'[H] Claim hidden items (x{ extra_item_amount } total)' )
+      print( f'[H] Claim hidden items (x{extra_item_amount} total)' )
     print( '[I] Get info' )
     print( '[M] Move item' )
     print( '[T] Trash item' )
@@ -2524,7 +2604,7 @@ def room_inventory( arg = "" ):
     print( '[Q] Close' )
 
   while True:
-    p = input( '> ' ).lower()
+    p = await input( '> ' ).lower()
 
     # Hidden items
     if p == 'h' and len( g_items_extra ) > 0:
@@ -2559,7 +2639,7 @@ def room_inventory( arg = "" ):
       # Get slot:
       print( 'Enter the item you want to get info for:' )
       while True:
-        p = input( '> ' ).upper()
+        p = await input( '> ' ).upper()
 
         # Make sure it matches a slot
         if p not in list( '1234567890ABCDEF' ):
@@ -2593,7 +2673,7 @@ def room_inventory( arg = "" ):
       print( 'Enter the item you want to move:' )
       old_p = ''
       while True:
-        p = input( '> ' ).upper()
+        p = await input( '> ' ).upper()
 
         # Make sure it matches a slot
         if p not in list( '1234567890ABCDEF' ):
@@ -2619,7 +2699,7 @@ def room_inventory( arg = "" ):
           # Swap, print message, and re-show inventory
           update_inv( *g_items[p], mode = 's', slot = old_p )
           update_inv( *swap_buffer, mode = 's', slot = p )
-          print( f'[!] Moved "{ item_meta( p, c = 1 ) }".' if g_items[old_p][1] == 0 else f'[!] Swapped "{ item_meta( p, c = 1 ) }" and "{ item_meta( old_p, c = 1 ) }"' )
+          print( f'[!] Moved "{item_meta( p, c = 1 )}".' if g_items[old_p][1] == 0 else f'[!] Swapped "{item_meta( p, c = 1 )}" and "{item_meta( old_p, c = 1 )}"' )
           goto_room( room_inventory )
 
     # Trash
@@ -2637,7 +2717,7 @@ def room_inventory( arg = "" ):
       # Get slot:
       print( 'Enter the item you want to trash:' )
       while True:
-        p = input( '> ' ).upper()
+        p = await input( '> ' ).upper()
 
         # Make sure it matches a slot
         if p not in list( '1234567890ABCDEF' ):
@@ -2655,7 +2735,7 @@ def room_inventory( arg = "" ):
         # Trash the item, and re-show inventory
         else:
           p = list( '1234567890ABCDEF' ).index( p )
-          print( f'[!] Trashed item "{ item_meta( p, c = 1 ) }"' )
+          print( f'[!] Trashed item "{item_meta( p, c = 1 )}"' )
           update_inv( 0, 0, mode = 's', slot = p )
           goto_room( room_inventory )
 
@@ -2672,30 +2752,30 @@ def room_inventory( arg = "" ):
       print( '[#] Unknown command.' )
 
 # Crafting room
-def room_crafting( arg = '' ):
+async def room_crafting( arg = '' ):
 
   # Store recipes object
   RECIPES = [
-    { 'req': { I_WOOD: 1, I_GEL: 1 }, 'res': [ I_TORCH, 3 ] },
-    { 'req': { I_WOOD: 1, I_STONE: 1 }, 'res': [ I_ARROW, 5 ] },
-    { 'req': { I_ARROW: 5, I_TORCH: 1 }, 'res': [ I_F_ARROW, 5 ] },
-    { 'req': { I_WOOD: 5 }, 'res': [ I_PLATFORM, 2 ] },
-    { 'req': { I_WOOD: 12, I_IRON_BAR: 2 }, 'res': [ I_CHEST, 1 ] },
-    { 'req': { I_FEATHER: 24 }, 'res': [ I_HARPY_WINGS, 1 ] },
-    { 'req': { I_IRON_ORE: 3 }, 'res': [ I_IRON_BAR, 1 ] },
-    { 'req': { I_SILVER_ORE: 3 }, 'res': [ I_SILVER_BAR, 1 ] },
-    { 'req': { I_GOLD_ORE: 3 }, 'res': [ I_GOLD_BAR, 1 ] },
-    { 'req': { I_WOOD: 8, I_IRON_BAR: 8 }, 'res': [ I_I_SWORD, 1 ] },
-    { 'req': { I_WOOD: 8, I_SILVER_BAR: 8 }, 'res': [ I_S_SWORD, 1 ] },
-    { 'req': { I_WOOD: 8, I_GOLD_BAR: 8 }, 'res': [ I_G_SWORD, 1 ] },
-    { 'req': { I_WOOD: 12 }, 'res': [ I_W_BOW, 1 ] },
-    { 'req': { I_IRON_BAR: 6 }, 'res': [ I_I_BOW, 1 ] },
-    { 'req': { I_SILVER_BAR: 6 }, 'res': [ I_S_BOW, 1 ] },
-    { 'req': { I_GOLD_BAR: 30 }, 'res': [ I_G_BOW, 1 ] },
-    { 'req': { I_IRON_BAR: 30 }, 'res': [ I_I_ARMOR, 1 ] },
-    { 'req': { I_SILVER_BAR: 30 }, 'res': [ I_S_ARMOR, 1 ] },
-    { 'req': { I_GOLD_BAR: 30 }, 'res': [ I_G_ARMOR, 1 ] },
-    { 'req': { I_LENS: 6 }, 'res': [ I_SUS_EYE, 1 ] }
+    {'req': {I_WOOD: 1, I_GEL: 1}, 'res': [ I_TORCH, 3 ]},
+    {'req': {I_WOOD: 1, I_STONE: 1}, 'res': [ I_ARROW, 5 ]},
+    {'req': {I_ARROW: 5, I_TORCH: 1}, 'res': [ I_F_ARROW, 5 ]},
+    {'req': {I_WOOD: 5}, 'res': [ I_PLATFORM, 2 ]},
+    {'req': {I_WOOD: 12, I_IRON_BAR: 2}, 'res': [ I_CHEST, 1 ]},
+    {'req': {I_FEATHER: 24}, 'res': [ I_HARPY_WINGS, 1 ]},
+    {'req': {I_IRON_ORE: 3}, 'res': [ I_IRON_BAR, 1 ]},
+    {'req': {I_SILVER_ORE: 3}, 'res': [ I_SILVER_BAR, 1 ]},
+    {'req': {I_GOLD_ORE: 3}, 'res': [ I_GOLD_BAR, 1 ]},
+    {'req': {I_WOOD: 8, I_IRON_BAR: 8}, 'res': [ I_I_SWORD, 1 ]},
+    {'req': {I_WOOD: 8, I_SILVER_BAR: 8}, 'res': [ I_S_SWORD, 1 ]},
+    {'req': {I_WOOD: 8, I_GOLD_BAR: 8}, 'res': [ I_G_SWORD, 1 ]},
+    {'req': {I_WOOD: 12}, 'res': [ I_W_BOW, 1 ]},
+    {'req': {I_IRON_BAR: 6}, 'res': [ I_I_BOW, 1 ]},
+    {'req': {I_SILVER_BAR: 6}, 'res': [ I_S_BOW, 1 ]},
+    {'req': {I_GOLD_BAR: 30}, 'res': [ I_G_BOW, 1 ]},
+    {'req': {I_IRON_BAR: 30}, 'res': [ I_I_ARMOR, 1 ]},
+    {'req': {I_SILVER_BAR: 30}, 'res': [ I_S_ARMOR, 1 ]},
+    {'req': {I_GOLD_BAR: 30}, 'res': [ I_G_ARMOR, 1 ]},
+    {'req': {I_LENS: 6}, 'res': [ I_SUS_EYE, 1 ]}
   ]
 
   # Try extracting page from argument
@@ -2708,8 +2788,8 @@ def room_crafting( arg = '' ):
     print_line()
     print( 'Crafting:' )
     for i in range( page * 8, min( page * 8 + 8, len( RECIPES ) ) ):
-      print( f"({ i % 8 + 1 }) { item_meta( RECIPES[ i ][ 'res' ][ 0 ] ) }  x{ RECIPES[ i ][ 'res' ][ 1 ] }" )
-    print( f'(Page { page + 1 }/{ len( RECIPES ) // 8 + 1 })' )
+      print( f"({i % 8 + 1}) {item_meta( RECIPES[ i ][ 'res' ][ 0 ] )}  x{RECIPES[ i ][ 'res' ][ 1 ]}" )
+    print( f'(Page {page + 1}/{len( RECIPES ) // 8 + 1})' )
     print()
     if page > 0:
       print( '[P] Previous Page' )
@@ -2720,7 +2800,7 @@ def room_crafting( arg = '' ):
     print( '[Q] Close' )
 
   while True:
-    p = input( '> ' ).lower()
+    p = await input( '> ' ).lower()
 
     # Previous page
     # (Only go if not on the first page of recipes)
@@ -2746,7 +2826,7 @@ def room_crafting( arg = '' ):
       # Get slot
       print( 'Enter the recipe you want ' + ( 'the ingredients of' if p == 'i' else 'to use' ) + ':' )
       while True:
-        p = input( '> ' ).lower()
+        p = await input( '> ' ).lower()
 
         # Attempt cast
         try:
@@ -2767,9 +2847,9 @@ def room_crafting( arg = '' ):
         slot_num = page * 8 + ( p - 1 ) # Shortening selected slot
   
         # Print data
-        print( f"Required ingredients for \"{ item_meta( RECIPES[slot_num]['res'][0] ) }\":" )
+        print( f"Required ingredients for \"{item_meta( RECIPES[slot_num]['res'][0] )}\":" )
         for i in RECIPES[slot_num]['req']:
-          print( f"- { item_meta( i ) } x{ RECIPES[slot_num]['req'][i] }" )
+          print( f"- {item_meta( i )} x{RECIPES[slot_num]['req'][i]}" )
   
         # Reload room
         goto_room( room_crafting, '1' + str( page ) )
@@ -2782,7 +2862,7 @@ def room_crafting( arg = '' ):
         # Get the quantity
         print( 'Enter the number of times you want to craft it:' )
         while True:
-          p = input( '> ' )
+          p = await input( '> ' )
 
           # Attempt cast
           try:
@@ -2808,7 +2888,7 @@ def room_crafting( arg = '' ):
         for i in RECIPES[slot_num]['req']:
           if update_inv( i, 0, mode = 't' ) < RECIPES[slot_num]['req'][i] * p:
             can_craft = False
-            print( f"[#] You need { RECIPES[slot_num]['req'][i] * p - update_inv( i, 0, mode = 't' ) } more \"{ item_meta( i ) }\"." )
+            print( f"[#] You need {RECIPES[slot_num]['req'][i] * p - update_inv( i, 0, mode = 't' )} more \"{item_meta( i )}\"." )
 
         # Continue onward if they have all the items
         if can_craft:
@@ -2818,7 +2898,7 @@ def room_crafting( arg = '' ):
             update_inv( i, RECIPES[slot_num]['req'][i] * p, mode = 'r' )
           update_inv( RECIPES[slot_num]['res'][0], RECIPES[slot_num]['res'][1] * p, mode = 'p' )
 
-          print( f"[!] You crafted \"{ item_meta( RECIPES[slot_num]['res'][0] ) }\" x{ RECIPES[slot_num]['res'][1] * p }." )
+          print( f"[!] You crafted \"{item_meta( RECIPES[slot_num]['res'][0] )}\" x{RECIPES[slot_num]['res'][1] * p}." )
 
           # Reload room
           goto_room( room_crafting, '!' + str( page ) )
@@ -2840,7 +2920,7 @@ def room_crafting( arg = '' ):
       print( '[#] Unknown command.' )
 
 # Chest UI
-def room_chest( arg = '' ):
+async def room_chest( arg = '' ):
 
   global g_items, g_tile_special
 
@@ -2850,7 +2930,7 @@ def room_chest( arg = '' ):
     goto_room( 0 )
 
   chest_coords = V2( int( arg.split( ',' )[1] ), int( arg.split( ',' )[2] ) )
-  if f'{ chest_coords.x } : { chest_coords.y }' not in g_tile_special:
+  if f'{chest_coords.x} : {chest_coords.y}' not in g_tile_special:
     print( 'ERROR: Chest not at block.' )
     goto_room( 0 )
   
@@ -2862,9 +2942,9 @@ def room_chest( arg = '' ):
     print( 'Chest:' )
     for i in range( 10 ):
       j = i // 2 + ( i % 2 ) * 5
-      item_string = f"({ '1234567890'[j] }) "
+      item_string = f"({'1234567890'[j]}) "
       item_string += ( item_meta( chest_slot( *chest_coords.l(), j ) ) if chest_slot( *chest_coords.l(), j, amount = True ) != 0 else '...' )
-      item_string += f"  x{ chest_slot( *chest_coords.l(), j, amount = True ) }" if chest_slot( *chest_coords.l(), j, amount = True ) != 0 else ''
+      item_string += f"  x{chest_slot( *chest_coords.l(), j, amount = True )}" if chest_slot( *chest_coords.l(), j, amount = True ) != 0 else ''
       item_string = item_string[:38]
       print( item_string + ' ' * ( 40 - len( item_string ) ), end = ( '' if j < 5 else '\n' ) )
     print()
@@ -2873,9 +2953,9 @@ def room_chest( arg = '' ):
     print( 'Inventory:' )
     for i in range( 16 ):
       j = i // 2 + ( i % 2 ) * 8
-      item_string = f"({ '1234567890ABCDEF'[j] }) "
+      item_string = f"({'1234567890ABCDEF'[j]}) "
       item_string += ( '* ' if g_slot == j else '' ) + ( item_meta( j, c = 1 ) if g_items[j][1] != 0 else '...' )
-      item_string += f"  x{ g_items[j][1] }" if g_items[j][1] != 0 else ''
+      item_string += f"  x{g_items[j][1]}" if g_items[j][1] != 0 else ''
       item_string = item_string[:38]
       print( item_string + ' ' * ( 40 - len( item_string ) ), end = ( '' if j < 8 else '\n' ) )
     print()
@@ -2885,7 +2965,7 @@ def room_chest( arg = '' ):
     print( '[Q] Close' )
 
   while True:
-    p = input( '> ' ).lower()
+    p = await input( '> ' ).lower()
 
     # Insert item
     if p == 'i':
@@ -2901,7 +2981,7 @@ def room_chest( arg = '' ):
       # Get slot:
       print( 'Enter the item you want to put in the chest:' )
       while True:
-        p = input( '> ' ).upper()
+        p = await input( '> ' ).upper()
 
         # Make sure it matches a slot
         if p not in list( '1234567890ABCDEF' ):
@@ -2917,7 +2997,7 @@ def room_chest( arg = '' ):
           slot_num = list( '1234567890ABCDEF' ).index( p )
           print( 'Enter how much you want to put in: ' )
           while True:
-            p = input( '> ' ).lower()
+            p = await input( '> ' ).lower()
 
             # Attempt cast
             try:
@@ -2949,7 +3029,7 @@ def room_chest( arg = '' ):
       # Get slot:
       print( 'Enter the item you want to take:' )
       while True:
-        p = input( '> ' ).upper()
+        p = await input( '> ' ).upper()
 
         # Make sure it matches a slot
         if p not in list( '1234567890' ):
@@ -2965,7 +3045,7 @@ def room_chest( arg = '' ):
           slot_num = list( '1234567890' ).index( p )
           print( 'Enter how much you want to take: ' )
           while True:
-            p = input( '> ' ).lower()
+            p = await input( '> ' ).lower()
 
             # Attempt cast
             try:
@@ -2991,15 +3071,15 @@ def room_chest( arg = '' ):
     else:
       print( '[#] Unknown command.' )
 
-def room_fight( arg = '' ):
+async def room_fight( arg = '' ):
 
   global g_monster, g_hp
 
   # PLAYER TURN
   if not ( len( arg ) > 0 and arg[0] == '1' ):
     print_line()
-    print( f'You: { g_hp } HP' )
-    print( f"{ g_monster.name.replace( '_', ' ' ).title() }: { g_monster.hp } HP" )
+    print( f'You: {g_hp} HP' )
+    print( f"{g_monster.name.replace( '_', ' ' ).title()}: {g_monster.hp} HP" )
     allowed_inputs = g_monster.get_options( player_turn = True )
     if update_inv( I_HEALTH_POTION, 0, 't' ) >= 1:
       print( '[H] Drink health potion' )
@@ -3008,7 +3088,7 @@ def room_fight( arg = '' ):
 
     # Get inputs
     while True:
-      p = input( '> ' ).lower()
+      p = await input( '> ' ).lower()
 
       # Pause
       if p == '*':
@@ -3017,7 +3097,7 @@ def room_fight( arg = '' ):
       # Heal
       elif p == 'h' and update_inv( I_HEALTH_POTION, 0, 't' ) >= 1:
         print( '[!] You used a healing potion.' )
-        print( f'[*] YOU: +{ min( g_hp + 100, g_hp_max ) - g_hp } HP' )
+        print( f'[*] YOU: +{min( g_hp + 100, g_hp_max ) - g_hp} HP' )
         g_hp = min( g_hp + 100, g_hp_max )
         g_monster.turn( 'n', player_turn = True )
         break
@@ -3033,15 +3113,15 @@ def room_fight( arg = '' ):
 
   # ENEMY TURN
   print_line()
-  print( f'You: { g_hp } HP' )
-  print( f"{ g_monster.name.replace( '_', ' ' ).title() }: { g_monster.hp } HP" )
+  print( f'You: {g_hp} HP' )
+  print( f"{g_monster.name.replace( '_', ' ' ).title()}: {g_monster.hp} HP" )
   allowed_inputs = g_monster.get_options( player_turn = False )
   print( '[!] Attempt escape' )
   print( '[*] Pause' )
 
   # Get inputs
   while True:
-    p = input( '> ' ).lower()
+    p = await input( '> ' ).lower()
 
     # Pause
     if p == '*':
@@ -3051,7 +3131,7 @@ def room_fight( arg = '' ):
     elif p == '!':
       if random.randint( 1, 15 ) <= ( 5 if update_inv( I_SHACKLE, 0, mode = 't' ) == 0 else 12 ):
         print( '[!] You successfully escaped.' )
-        input( '[!] Press enter to exit the fight. ' )
+        await input( '[!] Press enter to exit the fight. ' )
         goto_room( room_scene )
       else:
         print( '[!] Your attempt to escape was unsuccessful.' )
@@ -3072,21 +3152,21 @@ def room_fight( arg = '' ):
 
   goto_room( room_fight )
 
-def room_bossfight():
+async def room_bossfight():
 
   global g_monster, g_hp
 
   # PLAYER TURN
   print_line()
-  print( f'You: { g_hp } HP' )
-  print( f"Eye of Cthulhu: { g_monster.hp } HP" )
+  print( f'You: {g_hp} HP' )
+  print( f"Eye of Cthulhu: {g_monster.hp} HP" )
   allowed_inputs = g_monster.get_options( player_turn = True )
   print( '\n(CHOOSE A 3-MOVE COMBO)\n' )
   print( '[*] Pause' )
 
   # Get inputs
   while True:
-    p = input( '> ' ).lower()
+    p = await input( '> ' ).lower()
 
     # Pause
     if p == '*':
@@ -3106,15 +3186,15 @@ def room_bossfight():
 
   # ENEMY TURN
   print_line()
-  print( f'You: { g_hp } HP' )
-  print( f"Eye of Cthulhu: { g_monster.hp } HP" )
+  print( f'You: {g_hp} HP' )
+  print( f"Eye of Cthulhu: {g_monster.hp} HP" )
   allowed_inputs = g_monster.get_options( player_turn = False )
   print( '\n(CHOOSE A 3-MOVE COMBO)\n' )
   print( '[*] Pause' )
 
   # Get inputs
   while True:
-    p = input( '> ' ).lower()
+    p = await input( '> ' ).lower()
 
     # Pause
     if p == '*':
@@ -3138,24 +3218,24 @@ def room_bossfight():
 
   goto_room( room_bossfight )
 
-def room_death():
+async def room_death():
 
   global g_hp, g_pos, g_deaths
 
   g_deaths += 1
 
   print_line()
-  time.sleep( 1 )
+  await sleep( 1 )
   for c in 'You were slain...':
     print( c, end = '', flush = True )
-    time.sleep( 0.3 )
+    await sleep( 0.3 )
 
-  time.sleep( 1.5 )
+  await sleep( 1.5 )
   print()
   
   for i in range( 5, 0, -1 ):
-    print( f'Respawning in {i} second{ "s" if i != 1 else "" }.     ', end = '\r' )
-    time.sleep( 1 )
+    print( f'Respawning in {i} second{"s" if i != 1 else ""}.     ', end = '\r' )
+    await sleep( 1 )
   print( 'Respawning!' + ' ' * 20 )
 
   g_hp = g_hp_max
@@ -3164,7 +3244,7 @@ def room_death():
   goto_room( room_scene )
 
 # Pause room
-def room_pause( arg = '' ):
+async def room_pause( arg = '' ):
 
   # Show options
   print_line()
@@ -3172,7 +3252,7 @@ def room_pause( arg = '' ):
   print( '[X] Return to game' )
 
   while True:
-    p = input( '> ' ).lower()
+    p = await input( '> ' ).lower()
 
     # Quit
     if p == 'q':
@@ -3199,7 +3279,7 @@ def room_pause( arg = '' ):
 #
 # ENTER MAIN LOOP
 #
-def run():
+async def run():
 
   # Load global data
   data_main_init()
@@ -3233,6 +3313,6 @@ def run():
   # Wait for input before ending program
   # (Windows consoles automatically close upon the end of a program,
   # which isn't helpful if I want to be able to read a crash message.)
-  input( 'Press enter to exit.' )
+  await input( 'Press enter to exit.' )
 
 run()
