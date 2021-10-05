@@ -4,6 +4,205 @@ import random
 import traceback
 import time
 
+# Used for switching rooms
+class MoveException( BaseException ):
+
+  def __init__( self, room, arg ):
+    self.room = room
+    self.arg = arg
+
+# A pretty simple 2D vector class
+# Its main purpose is to allow you to perform calculations that I find helpful
+# e.g. instead of writing `a = V2( a.x * 3, a.y * 5 )`, you can write `a.m( 3, 5 )`
+class V2:
+
+  def __init__( self, x = 0, y = 0 ):
+    self.u( x, y )
+
+  # These two functions help to reduce repetitive code within the operation functions
+  def __op( self, a, b, op ):
+
+    if op == '+': return a + b
+    if op == '-': return a - b
+    if op == '*': return a * b
+    if op == '/': return a / b
+
+  def __op2( self, a, b, op ):
+
+    if isinstance( a, V2 ):
+      self.x = self.__op( self.x, a.x, op )
+      self.y = self.__op( self.y, a.y, op )
+    else:
+      self.x = self.__op( self.x, a, op )
+      self.y = self.__op( self.y, a if b == 'd' else b, op )
+
+  # Update
+  def u( self, a = 0, b = 0 ):
+    self.x = a
+    self.y = b
+    return self
+
+  # Add
+  def a( self, a, b = 'd' ):
+    self.__op2( a, b, '+' )
+    return self
+
+  # Subtract
+  def s( self, a, b = 'd' ):
+    self.__op2( a, b, '-' )
+    return self
+
+  # Multiply
+  def m( self, a, b = 'd' ):
+    self.__op2( a, b, '*' )
+    return self
+
+  # Divide
+  def d( self, a, b = 'd' ):
+    self.__op2( a, b, '/' )
+    return self
+
+  # Return a list
+  def l( self ):
+    return [ self.x, self.y ]
+
+  # Return a copy
+  def copy( self ):
+    c = V2( self.x, self.y )
+    return c
+
+# ITEM CONSTANTS
+I_NULL = 0
+I_C_SSWORD = 1
+I_C_PICK = 2
+I_GRASS = 3
+I_STONE = 4
+I_WOOD = 5
+I_IRON_ORE = 6
+I_SILVER_ORE = 7
+I_GOLD_ORE = 8
+I_IRON_BAR = 9
+I_SILVER_BAR = 10
+I_GOLD_BAR = 11
+I_W_SWORD = 12
+I_I_SWORD = 13
+I_S_SWORD = 14
+I_G_SWORD = 15
+I_W_BOW = 16
+I_I_BOW = 17
+I_S_BOW = 18
+I_G_BOW = 19
+I_TORCH = 20
+I_ARROW = 21
+I_F_ARROW = 22
+I_PLATFORM = 23
+I_CHEST = 24
+I_SUS_EYE = 25
+I_GRENADE = 26
+I_HEALTH_POTION = 27
+I_CRYSTAL = 28
+I_MAGIC_STAFF = 29
+I_TROPHY = 30
+I_MEGA_CRYSTAL = 31
+I_SHACKLE = 32
+I_HARPY_WINGS = 33
+I_I_ARMOR = 34
+I_S_ARMOR = 35
+I_G_ARMOR = 36
+I_GEL = 37
+I_FEATHER = 38
+I_LENS = 39
+
+ITEM_META = [
+  [ 'NULL', 'An item you shouldn\'t have' ],
+  [ 'Copper Shortsword', 'Better than nothing! ## Medn damage: 12' ],
+  [ 'Copper Pickaxe', 'The best pick in the game ## (Also the only pick in the game)' ],
+  [ 'Grass', 'Not useful for much, but you\'ll acquire it anyway ## Placeable' ],
+  [ 'Stone', 'The most prevalent material in the world ## Placeable ## Material' ],
+  [ 'Wood', 'A reliable building block/material ## Placeable ## Material' ],
+  [ 'Iron Ore', 'A relatively weak ore ## Material' ],
+  [ 'Silver Ore', 'A slightly more powerful ore ## Material' ],
+  [ 'Gold Ore', 'A relatively strong ore ## Material' ],
+  [ 'Iron Bar', 'A relatively weak bar ## Material' ],
+  [ 'Silver Bar', 'A slightly more powerful bar ## Material' ],
+  [ 'Gold Bar', 'A relatively strong bar ## Material' ],
+  [ 'Wooden Sword', 'Unobtainable because I forgot I was supposed to make them' ],
+  [ 'Iron Sword', 'Not that strong ## Mean damage: 18' ],
+  [ 'Silver Sword', 'Decently strong ## Mean damage: 22' ],
+  [ 'Golden Sword', 'Pretty strong ## Mean damage: 26' ],
+  [ 'Wooden Bow', 'Pretty weak ## Mean damage: 9' ],
+  [ 'Iron Bow', 'Not that strong ## Mean damage: 14' ],
+  [ 'Silver Bow', 'Decently strong ## Mean damage: 17' ],
+  [ 'Golden Bow', 'Pretty strong ## Mean damage: 22' ],
+  [ 'Torch', 'bright. ## Material' ],
+  [ 'Arrow', 'Used as ammo for bows ## Material' ],
+  [ 'Flaming Arrow', 'Used as ammo for bows ## Damage multiplier: 2' ],
+  [ 'Wooden Platform', 'Can be stood on or passed through' ],
+  [ 'Chest', 'Holds items ## (Also took a long time to program)' ],
+  [ 'Sus Eye', 'You should use it; it\'d make for a cool party trick ## What could go wrong?' ],
+  [ 'Grenade', 'Explodes on contact, dealing a lot of damage ## Mean damage: 36' ],
+  [ 'Healing Potion', 'Usable anytime ## Grants 100 HP' ],
+  [ 'Life Crystal', 'Increases MHP by 20 HP' ],
+  [ 'Magic Staff', 'Extremely strong ## Mean damage: 30 ## Damage multiplier: 3 (33% chance)' ],
+  [ 'Trophy', 'That\'s it. That\'s all you get.' ],
+  [ 'Mega Crytstal', 'Description' ],
+  [ 'Shackle', 'Drastically increases your chance of fleeing from a battle.' ],
+  [ 'Harpy Wings', 'Infinite upward mobility ## (Equipped automatically)' ],
+  [ 'Iron Armor', 'Not that strong ## 30% damage absorption ## (Equipped automatically)' ],
+  [ 'Silver Armor', 'Decently strong ## 55% damage absorption ## (Equipped automatically)' ],
+  [ 'Gold Armor', 'Pretty strong ## 85% damage absorption ## (Equipped automatically)' ],
+  [ 'Gel', 'Can be crafted into torches ## Material' ],
+  [ 'Feather', 'Used properly, can grant you access to the sky ## Material' ],
+  [ 'Lens', 'What could these be for? ## Material' ]
+]
+
+# GLOBAL CONSTANTS
+DEBUG = True
+SHOW_PROG = False
+AIR_BLOCKS = [ ' ', 'l', 'L', 'c', 'C', 'p' ]
+PLATFORM_BLOCKS = [ 'p' ]
+ITEM_BLOCKS = { 'g': I_GRASS, 's': I_STONE, 'w': I_WOOD, 'l': I_WOOD, 'i': I_IRON_ORE, 'S': I_SILVER_ORE, 'G': I_GOLD_ORE,
+  'p': I_PLATFORM, 'c': I_CHEST, 'C': I_CRYSTAL }
+
+# GLOBAL VARIABLES
+g_data = {}
+g_cname = ''
+g_wname = ''
+g_pos = V2( 0, 0 )
+g_spawn = V2( 0, 0 )
+g_view = V2( 0, 0 )
+g_world_size = V2( 0, 0 )
+g_tile_data = []
+g_tile_special = {}
+g_enemy_timer = 0
+g_seed = 0
+g_hp = 0
+g_hp_max = 0
+g_items = []
+g_items_extra = []
+g_slot = 0
+g_deaths = 0
+g_versions = [ '', '' ]
+g_play_time = 0
+g_play_time_last = 0
+g_show_help = True
+g_tmap = {
+  'player': 'Δ',
+  'air': ' ',
+  'grass': '~',
+  'stone': '#',
+  'log': ']',
+  'leaves': '*',
+  'iron': '&',
+  'silver': '$',
+  'gold': '%',
+  'wood': '=',
+  'chest': '©',
+  'crystal': '♥',
+  'enemy': '!'
+}
+g_monster = 0
+
 # Returns a number such that min <= x <= max
 def clamp( n, mn, mx ):
 
@@ -83,73 +282,6 @@ def char2tile( c ):
   if c == 'c': return g_tmap[ 'chest' ]
   if c == 'C': return g_tmap[ 'crystal' ]
   return '?'
-
-# Used for switching rooms
-class MoveException( BaseException ):
-
-  def __init__( self, room, arg ):
-    self.room = room
-    self.arg = arg
-
-# A pretty simple 2D vector class
-# Its main purpose is to allow you to perform calculations that I find helpful
-# e.g. instead of writing `a = V2( a.x * 3, a.y * 5 )`, you can write `a.m( 3, 5 )`
-class V2:
-
-  def __init__( self, x = 0, y = 0 ):
-    self.u( x, y )
-
-  # These two functions help to reduce repetitive code within the operation functions
-  def __op( self, a, b, op ):
-
-    if op == '+': return a + b
-    if op == '-': return a - b
-    if op == '*': return a * b
-    if op == '/': return a / b
-
-  def __op2( self, a, b, op ):
-
-    if isinstance( a, V2 ):
-      self.x = self.__op( self.x, a.x, op )
-      self.y = self.__op( self.y, a.y, op )
-    else:
-      self.x = self.__op( self.x, a, op )
-      self.y = self.__op( self.y, a if b == 'd' else b, op )
-
-  # Update
-  def u( self, a = 0, b = 0 ):
-    self.x = a
-    self.y = b
-    return self
-
-  # Add
-  def a( self, a, b = 'd' ):
-    self.__op2( a, b, '+' )
-    return self
-
-  # Subtract
-  def s( self, a, b = 'd' ):
-    self.__op2( a, b, '-' )
-    return self
-
-  # Multiply
-  def m( self, a, b = 'd' ):
-    self.__op2( a, b, '*' )
-    return self
-
-  # Divide
-  def d( self, a, b = 'd' ):
-    self.__op2( a, b, '/' )
-    return self
-
-  # Return a list
-  def l( self ):
-    return [ self.x, self.y ]
-
-  # Return a copy
-  def copy( self ):
-    c = V2( self.x, self.y )
-    return c
 
 # Monster class
 # This class (mainly the player_turn() and monster_turn() functions) is a little bit of a mess,
@@ -259,7 +391,7 @@ class Monster:
     'skeleton : n : shield' : [ 'The enemy remained stationary, and you didn\'t attack it.' ],
     'skeleton : n : jump' : [ 'The enemy jumped, and you didn\'t attack it.' ],
     'skeleton : n : move rightward' : [ 'The enemy moved rightward, and you didn\'t attack it.' ],
-    'skeleton : n : move leftward' : [ 'The enemy moved leftward, and you didn\'t attack it.', ( 8, 16 ) ],
+    'skeleton : n : move leftward' : [ 'The enemy moved leftward, and you didn\'t attack it.' ],
     'undead_miner : s : deflect' : [ 'The enemy stayed still, so you hit it with your sword.', ( 12, 24 ) ],
     'undead_miner : s : jump' : [ 'The enemy jumped over your sword.' ],
     'undead_miner : a : deflect' : [ 'You shot at the enemy, but it blew up your arrow with a grenade.' ],
@@ -357,16 +489,17 @@ class Monster:
     'cave_bat : s : low attack' : [ 'The enemy flew into you.', ( 10, 18 ) ],
     'cave_bat : s : high attack' : [ 'The enemy flew over you.' ],
     'cave_bat : ! : missed' : [ 'The enemy flew into you.', ( 10, 18 ) ],
+    'cave_bat : ! : low attack' : [ 'The enemy flew into you.', ( 10, 18 ) ],
     'cave_bat : ! : high attack' : [ 'The enemy flew over you.' ],
     'skeleton : j : charge' : [ 'The enemy charged toward you, and you jumped over it.' ],
     'skeleton : j : jump' : [ 'You and the enemy both jumped towards each other.', ( 18, 28 ) ],
     'skeleton : j : bone' : [ 'The enemy threw a bone at you, and you jumped over it.' ],
     'skeleton : j : bone upward' : [ 'The enemy threw a bone upward, and you jumped into it.', ( 18, 28 ) ],
-    'skeleton : b : charge' : [ 'The enemy charged toward you, and you didn\t back up far enough.', ( 20, 40 ) ],
+    'skeleton : b : charge' : [ 'The enemy charged toward you, and you didn\'t back up far enough.', ( 20, 40 ) ],
     'skeleton : b : jump' : [ 'The enemy tried to jump on you, but you moved backwards.' ],
     'skeleton : b : bone' : [ 'The enemy threw a bone, and it hit you.', ( 8, 18 ) ],
     'skeleton : b : bone upward' : [ 'The enemy threw a bone upward, and it missed you.' ],
-    'skeleton : ! : charge' : [ 'The enemy charged toward you, and you didn\t back up far enough.', ( 20, 40 ) ],
+    'skeleton : ! : charge' : [ 'The enemy charged toward you, and you didn\'t back up far enough.', ( 20, 40 ) ],
     'skeleton : ! : jump' : [ 'The enemy tried to jump on you, but you moved backwards.' ],
     'skeleton : ! : bone' : [ 'The enemy threw a bone, and it hit you.', ( 8, 18 ) ],
     'skeleton : ! : bone upward' : [ 'The enemy threw a bone upward, and it missed you.' ],
@@ -410,6 +543,20 @@ class Monster:
     'tim : ! : dual spell' : [ 'The enemy shot a dual spell to your right and left.' ],
     'tim : ! : circular spell' : [ 'The enemy shot a circular spell around you.' ],
     'tim : ! : teleports behind you' : [ 'The enemy teleported behind you.', ( 15, 25 ) ]
+  }
+
+  # Determines the chances for each item drop
+  # -1 in index 0 means 1 in (index 1) chance of dropping
+  # Otherwise, the two numbers form the range of the amount that will drop
+  DROPS = {
+    'slime': [ ( 1, 4, I_GEL ), ( 1, 1, I_HEALTH_POTION ) ],
+    'zombie': [ ( -1, 15, I_SHACKLE ), ( 1, 1, I_HEALTH_POTION ) ],
+    'demon_eye': [ ( -1, 2, I_LENS ), ( 1, 2, I_HEALTH_POTION ) ],
+    'cave_bat': [ ( 1, 2, I_HEALTH_POTION ) ],
+    'skeleton': [ ( 1, 2, I_GOLD_BAR ), ( 2, 2, I_HEALTH_POTION ) ],
+    'undead_miner': [ ( 4, 10, I_GRENADE ), ( 2, 3, I_HEALTH_POTION ) ],
+    'harpy': [ ( 1, 3, I_FEATHER ), ( 2, 3, I_HEALTH_POTION ) ],
+    'tim': [ ( -1, 2, I_MAGIC_STAFF ), ( 2, 5, I_HEALTH_POTION ) ]
   }
 
   def __init__( self, name ):
@@ -611,6 +758,7 @@ class Monster:
   # Checks if either entity has died
   def hp_check( self ):
 
+    # If player won
     if self.hp <= 0:
       print_line()
       print( f"[!] { self.name.replace( '_', ' ' ).title() } was killed." )
@@ -618,6 +766,7 @@ class Monster:
       input( '[!] Press enter to exit the fight. ' )
       goto_room( room_scene )
 
+    # If player lost
     if g_hp <= 0:
       print_line()
       print( f"[!] { self.name.replace( '_', ' ' ).title() } won." )
@@ -626,11 +775,47 @@ class Monster:
 
   def give_items( self ):
 
-    if self.name == 'slime':
-      pass
+    # Stores all the items the player will receive
+    temp_items = []
+    
+    # Loop through 
+    for i in self.DROPS[ self.name ]:
+
+      # Chance drop
+      if i[0] == -1 and random.randint( 1, i[1] ) == 1:
+        temp_items.append( ( i[2], 1 ) )
+
+      # Range drop
+      else:
+        temp_items.append( ( i[2], random.randint( i[0], i[1] ) ) )
+
+    # Print different messages for 0, 1, 2, and 3+ items
+    if len( temp_items ) == 0:
+      print( '[!] You received nothing.' )
+
+    if len( temp_items ) == 1:
+      print( f'[!] You received { temp_items[0][1] }x { item_meta( temp_items[0][0] ) }.' )
+      update_inv( temp_items[0][0], temp_items[0][1] )
+
+    elif len( temp_items ) == 2:
+      print( f'[!] You received { temp_items[0][1] }x { item_meta( temp_items[0][0] ) } ', end = '' )
+      print( f'and { temp_items[1][1] }x { item_meta( temp_items[1][0] ) }.' )
+      update_inv( temp_items[0][0], temp_items[0][1] )
+      update_inv( temp_items[1][0], temp_items[1][1] )
+
+    else:
+      print( f'[!] You received { temp_items[0][1] }x { item_meta( temp_items[0][0] ) }, ', end = '' )
+      update_inv( temp_items[0][0], temp_items[0][1] )
+      for i in temp_items[1:-1]:
+        print( f'{ i[1] }x { item_meta( i[0] ) }, ', end = '' )
+        update_inv( i[0], i[1] )
+      print( f'and { temp_items[-1][1] }x { item_meta( temp_items[-1][0] ) }.' )
+      update_inv( temp_items[-1][0], temp_items[-1][1] )
 
   def advance_move( self ):
 
+    # If you're trying to find each enemy's attack pattern,
+    # this is where you want to look
     if self.name == 'slime':
       self.move_c += 1
       if self.move_c % 2 == 0:
@@ -927,7 +1112,7 @@ def tick( nofall = False ):
 
 # Modify the inventory
 # Modes = pickup, remove, or set
-def update_inv( item_id, amount, mode = 'p', slot = 0 ):
+def update_inv( item_id, amount, mode = 'p', slot = 0, allow_stash = True ):
 
   global g_items, g_items_extra
 
@@ -969,7 +1154,9 @@ def update_inv( item_id, amount, mode = 'p', slot = 0 ):
           data_save()
           return True
 
-    g_items_extra.append( [ item_id, amount ] )
+    # If stash is allowed
+    if allow_stash:
+      g_items_extra.append( [ item_id, amount ] )
     return False
 
   # Removal mode
@@ -1240,26 +1427,26 @@ def try_fight():
 
   temp_rand = random.randint( 1, 100 ) # Used for deciding which enemy is encountered
 
-  # Top 40% - Harpies only
-  if ( g_pos.y < g_world_size.y * 0.4 ):
+  # Top 25% - Harpies only
+  if ( g_pos.y <= g_world_size.y * 0.25 ):
     start_fight( 'harpy' )
 
   # 40%-60% - 50% slime, 30% zombie, 20% demon_eye
-  elif ( g_world_size.y * 0.4 < g_pos.y < g_world_size.y * 0.6 ):
+  elif ( g_world_size.y * 0.25 < g_pos.y <= g_world_size.y * 0.6 ):
     if ( temp_rand < 50 ): start_fight( 'slime' )
     elif ( temp_rand < 80 ): start_fight( 'zombie' )
     else: start_fight( 'demon_eye' )
 
-  # 60%-80% - 40% cave bat, 60% skeleton
-  elif ( g_world_size.y * 0.6 < g_pos.y < g_world_size.y * 0.8 ):
-    if ( temp_rand < 40 ): start_fight( 'cave_bat' )
+  # 60%-80% - 70% cave bat, 30% skeleton
+  elif ( g_world_size.y * 0.6 < g_pos.y <= g_world_size.y * 0.8 ):
+    if ( temp_rand < 70 ): start_fight( 'cave_bat' )
     else: start_fight( 'skeleton' )
 
-  # Bottom 20% - 30% cave bat, 50% skeleton, 15% undead miner, 5% tim
-  elif ( g_world_size.y * 0.6 < g_pos.y < g_world_size.y * 0.8 ):
+  # Bottom 20% - 30% cave bat, 15% skeleton, 50% undead miner, 5% tim
+  elif ( g_world_size.y * 0.8 < g_pos.y ):
     if ( temp_rand < 30 ): start_fight( 'cave_bat' )
-    elif ( temp_rand < 80 ): start_fight( 'skeleton' )
-    elif ( temp_rand < 95 ): start_fight( 'undead_miner' )
+    elif ( temp_rand < 80 ): start_fight( 'undead_miner' )
+    elif ( temp_rand < 95 ): start_fight( 'skeleton' )
     else: start_fight( 'tim' )
 
 def start_fight( monster_id ):
@@ -1285,136 +1472,6 @@ def start_bossfight():
   print()
 
   goto_room( room_bossfight )
-
-# ITEM CONSTANTS
-I_NULL = 0
-I_C_SSWORD = 1
-I_C_PICK = 2
-I_GRASS = 3
-I_STONE = 4
-I_WOOD = 5
-I_IRON_ORE = 6
-I_SILVER_ORE = 7
-I_GOLD_ORE = 8
-I_IRON_BAR = 9
-I_SILVER_BAR = 10
-I_GOLD_BAR = 11
-I_W_SWORD = 12
-I_I_SWORD = 13
-I_S_SWORD = 14
-I_G_SWORD = 15
-I_W_BOW = 16
-I_I_BOW = 17
-I_S_BOW = 18
-I_G_BOW = 19
-I_TORCH = 20
-I_ARROW = 21
-I_F_ARROW = 22
-I_PLATFORM = 23
-I_CHEST = 24
-I_SUS_EYE = 25
-I_GRENADE = 26
-I_HEALTH_POTION = 27
-I_CRYSTAL = 28
-I_MAGIC_STAFF = 29
-I_TROPHY = 30
-I_MEGA_CRYSTAL = 31
-I_SHACKLE = 32
-I_HARPY_WINGS = 33
-I_I_ARMOR = 34
-I_S_ARMOR = 35
-I_G_ARMOR = 36
-I_GEL = 37
-I_FEATHER = 38
-
-ITEM_META = [
-  [ 'NULL', 'An item you shouldn\'t have' ],
-  [ 'Copper Shortsword', 'Better than nothing! ## Medn damage: 12' ],
-  [ 'Copper Pickaxe', 'The best pick in the game ## (Also the only pick in the game)' ],
-  [ 'Grass', 'Not useful for much, but you\'ll acquire it anyway ## Placeable' ],
-  [ 'Stone', 'The most prevalent material in the world ## Placeable ## Material' ],
-  [ 'Wood', 'A reliable building block/material ## Placeable ## Material' ],
-  [ 'Iron Ore', 'A relatively weak ore ## Material' ],
-  [ 'Silver Ore', 'A slightly more powerful ore ## Material' ],
-  [ 'Gold Ore', 'A relatively strong ore ## Material' ],
-  [ 'Iron Bar', 'A relatively weak bar ## Material' ],
-  [ 'Silver Bar', 'A slightly more powerful bar ## Material' ],
-  [ 'Gold Bar', 'A relatively strong bar ## Material' ],
-  [ 'Wooden Sword', 'Unobtainable because I forgot I was supposed to make them' ],
-  [ 'Iron Sword', 'Not that strong ## Mean damage: 18' ],
-  [ 'Silver Sword', 'Decently strong ## Mean damage: 22' ],
-  [ 'Golden Sword', 'Pretty strong ## Mean damage: 26' ],
-  [ 'Wooden Bow', 'Pretty weak ## Mean damage: 9' ],
-  [ 'Iron Bow', 'Not that strong ## Mean damage: 14' ],
-  [ 'Silver Bow', 'Decently strong ## Mean damage: 17' ],
-  [ 'Golden Bow', 'Pretty strong ## Mean damage: 22' ],
-  [ 'Torch', 'bright. ## Material' ],
-  [ 'Arrow', 'Used as ammo for bows ## Material' ],
-  [ 'Flaming Arrow', 'Used as ammo for bows ## Damage multiplier: 2' ],
-  [ 'Wooden Platform', 'Can be stood on or passed through' ],
-  [ 'Chest', 'Holds items ## (Also took a long time to program)' ],
-  [ 'Sus Eye', 'You should use it; it\'d make for a cool party trick ## What could go wrong?' ],
-  [ 'Grenade', 'Explodes on contact, dealing a lot of damage ## Mean damage: 36' ],
-  [ 'Healing Potion', 'Usable anytime ## Grants 100 HP' ],
-  [ 'Life Crystal', 'Increases MHP by 20 HP' ],
-  [ 'Magic Staff', 'Extremely strong ## Mean damage: 30 ## Damage multiplier: 3 (33% chance)' ],
-  [ 'Trophy', 'That\'s it. That\'s all you get.' ],
-  [ 'Mega Crytstal', 'Description' ],
-  [ 'Shackle', 'Drastically increases your chance of fleeing from a battle.' ],
-  [ 'Harpy Wings', 'Infinite upward mobility ## (Equipped automatically)' ],
-  [ 'Iron Armor', 'Not that strong ## 30% damage absorption ## (Equipped automatically)' ],
-  [ 'Silver Armor', 'Decently strong ## 55% damage absorption ## (Equipped automatically)' ],
-  [ 'Gold Armor', 'Pretty strong ## 85 % damage absorption ## (Equipped automatically)' ],
-  [ 'Gel', 'Can be crafted into torches ## Material' ],
-  [ 'Feather', 'You might be able to fly if you get enough of them ## Material' ]
-]
-
-# GLOBAL CONSTANTS
-DEBUG = True
-SHOW_PROG = False
-AIR_BLOCKS = [ ' ', 'l', 'L', 'c', 'C', 'p' ]
-PLATFORM_BLOCKS = [ 'p' ]
-ITEM_BLOCKS = { 'g': I_GRASS, 's': I_STONE, 'w': I_WOOD, 'l': I_WOOD, 'i': I_IRON_ORE, 'S': I_SILVER_ORE, 'G': I_GOLD_ORE,
-  'p': I_PLATFORM, 'c': I_CHEST, 'C': I_CRYSTAL }
-
-# GLOBAL VARIABLES
-g_data = {}
-g_cname = ''
-g_wname = ''
-g_pos = V2( 0, 0 )
-g_spawn = V2( 0, 0 )
-g_view = V2( 0, 0 )
-g_world_size = V2( 0, 0 )
-g_tile_data = []
-g_tile_special = {}
-g_enemy_timer = 0
-g_seed = 0
-g_hp = 0
-g_hp_max = 0
-g_items = []
-g_items_extra = []
-g_slot = 0
-g_deaths = 0
-g_versions = [ '', '' ]
-g_play_time = 0
-g_play_time_last = 0
-g_show_help = True
-g_tmap = {
-  'player': 'Δ',
-  'air': ' ',
-  'grass': '~',
-  'stone': '#',
-  'log': ']',
-  'leaves': '*',
-  'iron': '&',
-  'silver': '$',
-  'gold': '%',
-  'wood': '=',
-  'chest': '©',
-  'crystal': '♥',
-  'enemy': '!'
-}
-g_monster = 0
 
 # Initialize the data file if it doesn't exist
 def data_main_init():
@@ -1969,7 +2026,6 @@ def room_menu():
                                                                                     (v1.0)
 
 [P] Play
-[S] Settings
 [Q] Quit''')
 
   # Reset important stuff
@@ -2329,11 +2385,17 @@ def room_scene( arg = '' ):
       g_show_help = False
 
   while True:
-    p_def = input( '> ' )
-    p = p_def.lower()
+    p = input( '> ' )
+    parse_scene_cmd( p )
 
-    # Show generic help info
-    if p == 'h':
+def parse_scene_cmd( cmd ):
+
+  global g_pos, g_view, g_tile_data, g_show_help, g_slot, g_monster, g_hp, g_hp_max
+
+  p_def = cmd
+  p = cmd.lower()
+
+  if p == 'h':
       print( '[H] Show this screen' )
       print( '[H <command name>] Help with a specific command' )
       print( '[M] Move in direction' )
@@ -2344,440 +2406,460 @@ def room_scene( arg = '' ):
       print( '[S] Select item' )
       print( '[U] Use current item' )
       print( '[B] Break' )
+      print( '[Z] Break/Move' )
       print( '[P] Break' )
       print( '[C] Use chest' )
       if DEBUG: print( '[$] Debug' )
       print( '[*] Pause' )
 
-    # Show specific help info
-    elif p[0:2] == 'h ':
-      if p[2:] == 'h':
-        print( '[?] Syntax: h' )
-        print( '[?] Effect: Shows a list of valid commands.' )
-        print( '[?] Syntax: h <command>' )
-        print( '[?] Effect: Shows help for a specific command.' )
-        print( '[?] (I mean, you clearly already know how this works...)' )
-      elif p[2:] == '*':
-        print( '[?] Syntax: *' )
-        print( '[?] Effect: Brings up the pause menu.' )
-      elif p[2:] == 'm':
-        print( '[?] Syntax: m <direction> [steps (1)]' )
-        print( '[?] Effect: Moves the specified number of steps in the given direction.' )
-      elif p[2:] == 'j':
-        print( '[?] Syntax: j [height (5)]' )
-        print( '[?] Effect: Jumps the specified height.' )
-      elif p[2:] == 'd':
-        print( '[?] Syntax: d' )
-        print( '[?] Effect: Moves downward through pseudo-solid blocks' )
-      elif p[2:] == 'w':
-        print( '[?] Syntax: w' )
-        print( '[?] Effect: Allows a game tick to pass without the player performing an action.' )
-      elif p[2:] == 'i':
-        print( '[?] Syntax: i' )
-        print( '[?] Effect: Opens the inventory.' )
-      elif p[2:] == 's':
-        print( '[?] Syntax: s <slot ID>' )
-        print( '[?] Effect: Selects the item in a given slot.' )
-        print( '[?] (Open your inventory to check slot IDs.)' )
-      elif p[2:] == 'u':
-        print( '[?] Syntax: u' )
-        print( '[?] Effect: Uses the currently selected item.' )
-        print( '[?] Effect: (Most items don\'t have a use function).' )
-      elif p[2:] == 'b':
-        print( '[?] Syntax: b <x> <y>' )
-        print( '[?] Effect: Breaks the block x units right of the player and y units below the player.' )
-        print( '[?] (Maximum is 4 blocks away in any direction.)' )
-        print( '[?] Syntax: b <direction>' )
-        print( '[?] Effect: Breaks the block 1 unit away from the player in the specified direction.' )
-        print( '[?] (Accepted directions are "left", "right", "up", and "down".)' )
-      elif p[2:] == 'p':
-        print( '[?] Syntax: p <x> <y>' )
-        print( '[?] Effect: Places the selected block x units right of the player and y units below the player.' )
-        print( '[?] (Maximum is 4 blocks away in any direction.)' )
-        print( '[?] Syntax: p <direction>' )
-        print( '[?] Effect: Places the selected block 1 unit away from the player in the specified direction.' )
-        print( '[?] (Accepted directions are "left", "right", "up", and "down".)' )
-      elif p[2:] == 'c':
-        print( '[?] Syntax: c' )
-        print( '[?] Effect: Opens a chest within the same block as the player.' )
-        print( '[?] Syntax: c <x> <y>' )
-        print( '[?] Effect: Opens a chest x units right of the player and y units below the player.' )
-        print( '[?] (Maximum is 4 blocks away in any direction.)' )
-      elif p[2:] == '$' and DEBUG:
-        print( '[?] Syntax: $ <command> <arguments>' )
-        print( '[?] Effect: Runs a sub-command.' )
-        print()
-        print( '[?] All sub commands can be found below:' )
-        print( '[?] Syntax: $ jump <x> <y>' )
-        print( '[?] Effect: Jumps to a position (x, y) within the world.' )
-        print( '[?] Syntax: $ shift <x> <y>' )
-        print( '[?] Effect: Moves x units rightward and y units downward.' )
-        print( '[?] Syntax: $ give <id> [amount]' )
-        print( '[?] Effect: Gives the player the specified amount of the given item.' )
-        print( '[?] Syntax: $ take <id> [amount]' )
-        print( '[?] Effect: Removes the specified amount of the given item.' )
-        print( '[?] Syntax: $ set <x> <y> <block>' )
-        print( '[?] Effect: Replaces the block at (x, y) relative to the player.' )
-        print( '[?] Syntax: $ fight <monster id>' )
-        print( '[?] Effect: Triggers a fight with the supplied monster ID.' )
-        print( '[?] Syntax: $ execute <code>' )
-        print( '[?] Effect: Sends code to the Python interpreter.' )
-      else:
-        print( f'[#] Unknown command "{ p[2:] }".' )
+  # Show specific help info
+  elif p[0:2] == 'h ':
+    if p[2:] == 'h':
+      print( '[?] Syntax: h' )
+      print( '[?] Effect: Shows a list of valid commands.' )
+      print( '[?] Syntax: h <command>' )
+      print( '[?] Effect: Shows help for a specific command.' )
+      print( '[?] (I mean, you clearly already know how this works...)' )
+    elif p[2:] == '*':
+      print( '[?] Syntax: *' )
+      print( '[?] Effect: Brings up the pause menu.' )
+    elif p[2:] == 'm':
+      print( '[?] Syntax: m <direction> [steps (1)]' )
+      print( '[?] Effect: Moves the specified number of steps in the given direction.' )
+    elif p[2:] == 'j':
+      print( '[?] Syntax: j [height (5)]' )
+      print( '[?] Effect: Jumps the specified height.' )
+    elif p[2:] == 'd':
+      print( '[?] Syntax: d' )
+      print( '[?] Effect: Moves downward through pseudo-solid blocks' )
+    elif p[2:] == 'w':
+      print( '[?] Syntax: w' )
+      print( '[?] Effect: Allows a game tick to pass without the player performing an action.' )
+    elif p[2:] == 'i':
+      print( '[?] Syntax: i' )
+      print( '[?] Effect: Opens the inventory.' )
+    elif p[2:] == 's':
+      print( '[?] Syntax: s <slot ID>' )
+      print( '[?] Effect: Selects the item in a given slot.' )
+      print( '[?] (Open your inventory to check slot IDs.)' )
+    elif p[2:] == 'u':
+      print( '[?] Syntax: u' )
+      print( '[?] Effect: Uses the currently selected item.' )
+      print( '[?] Effect: (Most items don\'t have a use function).' )
+    elif p[2:] == 'b':
+      print( '[?] Syntax: b <x> <y>' )
+      print( '[?] Effect: Breaks the block x units right of the player and y units below the player.' )
+      print( '[?] (Maximum is 4 blocks away in any direction.)' )
+      print( '[?] Syntax: b <direction>' )
+      print( '[?] Effect: Breaks the block 1 unit away from the player in the specified direction.' )
+      print( '[?] (Accepted directions are "left", "right", "up", and "down".)' )
+    elif p[2:] == 'z':
+      print( '[?] Syntax: z <direction>' )
+      print( '[?] Effect: Runs the break command and the move command in succession' )
+      print( '[?] (Accepted directions are "left", "right", "up", and "down".)' )
+    elif p[2:] == 'p':
+      print( '[?] Syntax: p <x> <y>' )
+      print( '[?] Effect: Places the selected block x units right of the player and y units below the player.' )
+      print( '[?] (Maximum is 4 blocks away in any direction.)' )
+      print( '[?] Syntax: p <direction>' )
+      print( '[?] Effect: Places the selected block 1 unit away from the player in the specified direction.' )
+      print( '[?] (Accepted directions are "left", "right", "up", and "down".)' )
+    elif p[2:] == 'c':
+      print( '[?] Syntax: c' )
+      print( '[?] Effect: Opens a chest within the same block as the player.' )
+      print( '[?] Syntax: c <x> <y>' )
+      print( '[?] Effect: Opens a chest x units right of the player and y units below the player.' )
+      print( '[?] (Maximum is 4 blocks away in any direction.)' )
+    elif p[2:] == '$' and DEBUG:
+      print( '[?] Syntax: $ <command> <arguments>' )
+      print( '[?] Effect: Runs a sub-command.' )
+      print()
+      print( '[?] All sub commands can be found below:' )
+      print( '[?] Syntax: $ jump <x> <y>' )
+      print( '[?] Effect: Jumps to a position (x, y) within the world.' )
+      print( '[?] Syntax: $ shift <x> <y>' )
+      print( '[?] Effect: Moves x units rightward and y units downward.' )
+      print( '[?] Syntax: $ give <id> [amount]' )
+      print( '[?] Effect: Gives the player the specified amount of the given item.' )
+      print( '[?] Syntax: $ take <id> [amount]' )
+      print( '[?] Effect: Removes the specified amount of the given item.' )
+      print( '[?] Syntax: $ set <x> <y> <block>' )
+      print( '[?] Effect: Replaces the block at (x, y) relative to the player.' )
+      print( '[?] Syntax: $ fight <monster id>' )
+      print( '[?] Effect: Triggers a fight with the supplied monster ID.' )
+      print( '[?] Syntax: $ execute <code>' )
+      print( '[?] Effect: Sends code to the Python interpreter.' )
+    else:
+      print( f'[#] Unknown command "{ p[2:] }".' )
 
-    # Pause game
-    elif p == '*':
-      print( '[!] Game was paused.' )
-      goto_room( room_pause )
+  # Pause game
+  elif p == '*':
+    print( '[!] Game was paused.' )
+    goto_room( room_pause )
 
-    # Move command
-    elif p == 'm':
-      print( '[#] Must supply a direction.' )
+  # Move command
+  elif p == 'm':
+    print( '[#] Must supply a direction.' )
 
-    elif p[:2] == 'm ':
+  elif p[:2] == 'm ':
 
-      # Make sure direction is valid
-      if p.split( ' ' )[1] not in ( 'right', 'r', 'left', 'l' ):
-        print( '[#] Invalid direction. (Accepts: "right", "left", "r", "l")' )
+    # Make sure direction is valid
+    if p.split( ' ' )[1] not in ( 'right', 'r', 'left', 'l' ):
+      print( '[#] Invalid direction. (Accepts: "right", "left", "r", "l")' )
 
-      else:
+    else:
 
-        # Get step count
-        if len( p.split( ' ' ) ) >= 3:
-          try:
-            step_count = int( p.split( ' ' )[2] )
-          except ValueError:
-            print( '[#] Enter a number.' )
-            step_count = 'ERROR'
-        else:
-          step_count = 1
-
-        if step_count != 'ERROR':
-
-          # Check range
-          if not ( 0 < step_count <= 5 ):
-            print( '[#] Step count out of range.' )
-
-          # Move in given direction, run game tick, save data, and reload stage
-          else:
-            for i in range( step_count ):
-              if ( 0 <= g_pos.x + ( 1 if p.split( ' ' )[1][0] == 'r' else -1 ) < g_world_size.x ):
-
-                # Move in direction if air
-                if get_tile( g_pos.x + ( 1 if p.split( ' ' )[1][0] == 'r' else -1 ), g_pos.y ) in AIR_BLOCKS:
-                  g_pos.x += ( 1 if p.split( ' ' )[1][0] == 'r' else -1 )
-
-                # Else, try to step up one block
-                elif g_pos.y > 0 and get_tile( g_pos.x + ( 1 if p.split( ' ' )[1][0] == 'r' else -1 ), g_pos.y - 1 ) in AIR_BLOCKS:
-                  g_pos.a( ( 1 if p.split( ' ' )[1][0] == 'r' else -1 ), -1 )
-
-            data_save()
-            tick()
-            goto_room( room_scene )
-
-    # Jump command
-    elif p == 'j' or p[:2] == 'j ':
-
-      # Get jump height
-      if len( p ) > 1:
+      # Get step count
+      if len( p.split( ' ' ) ) >= 3:
         try:
-          jump_height = int( p[2:] )
+          step_count = int( p.split( ' ' )[2] )
         except ValueError:
           print( '[#] Enter a number.' )
-          jump_height = 'ERROR'
+          step_count = 'ERROR'
       else:
-        jump_height = 5
+        step_count = 1
 
-      if jump_height != 'ERROR':
+      if step_count != 'ERROR':
 
         # Check range
-        if not ( 0 < jump_height <= ( 20 if update_inv( I_HARPY_WINGS, 0, mode = 't' ) > 0 else 5 ) ):
-          print( '[#] Jump height out of range.' )
+        if not ( 0 < step_count <= 5 ):
+          print( '[#] Step count out of range.' )
 
-        # If not on block and not on floor (unless they have wings), run game tick and reload stage
-        elif g_pos.y + 1 < g_world_size.y and get_tile( g_pos.x, g_pos.y + 1 ) in AIR_BLOCKS and update_inv( I_HARPY_WINGS, 0, mode = 't' ) == 0:
+        # Move in given direction, run game tick, save data, and reload stage
+        else:
+          for i in range( step_count ):
+            if ( 0 <= g_pos.x + ( 1 if p.split( ' ' )[1][0] == 'r' else -1 ) < g_world_size.x ):
+
+              # Move in direction if air
+              if get_tile( g_pos.x + ( 1 if p.split( ' ' )[1][0] == 'r' else -1 ), g_pos.y ) in AIR_BLOCKS:
+                g_pos.x += ( 1 if p.split( ' ' )[1][0] == 'r' else -1 )
+
+              # Else, try to step up one block
+              elif g_pos.y > 0 and get_tile( g_pos.x + ( 1 if p.split( ' ' )[1][0] == 'r' else -1 ), g_pos.y - 1 ) in AIR_BLOCKS:
+                g_pos.a( ( 1 if p.split( ' ' )[1][0] == 'r' else -1 ), -1 )
+
+          data_save()
           tick()
           goto_room( room_scene )
 
-        # Jump, run game tick, save data, and reload stage
-        else:
-          for i in range( jump_height ):
+  # Jump command
+  elif p == 'j' or p[:2] == 'j ':
 
-            # Move up if possible
-            if g_pos.y > 0 and get_tile( g_pos.x, g_pos.y - 1 ) in AIR_BLOCKS:
-              g_pos.y -= 1
+    # Get jump height
+    if len( p ) > 1:
+      try:
+        jump_height = int( p[2:] )
+      except ValueError:
+        print( '[#] Enter a number.' )
+        jump_height = 'ERROR'
+    else:
+      jump_height = 5
 
-          data_save()
-          tick( nofall = True )
-          goto_room( room_scene )
-    
-    # Down command
-    elif p == 'd':
-    
-      # Go through platform
-      if g_pos.y < g_world_size.y - 1 and get_tile( g_pos.copy().a( 0, 1 ) ) == 'p':
-        g_pos.a( 0, 1 )
-      tick()
-      goto_room( room_scene )
+    if jump_height != 'ERROR':
 
-    # Wait
-    elif p == 'w':
+      # Check range
+      if not ( 0 < jump_height <= ( 20 if update_inv( I_HARPY_WINGS, 0, mode = 't' ) > 0 else 5 ) ):
+        print( '[#] Jump height out of range.' )
 
-      tick()
-      goto_room( room_scene )
-
-    # Inventory
-    elif p == 'i':
-      goto_room( room_inventory )
-
-    # Select
-    elif p == 's':
-      print( '[#] Must supply slot ID.' )
-
-    elif p[:2] == 's ':
-
-      # Make sure it matches a slot
-      if p[2:] not in list( '1234567890abcdef' ):
-        print( '[#] Enter a number from 0-9 or a letter from A-F.' )
-
-      else:
-
-        # Select slot
-        g_slot = list( '1234567890abcdef' ).index( p[2:] )
-        print( f'[!] Selected "{ item_meta( g_slot, c = 1 ) }".' if g_items[ g_slot ][1] > 0 else '[!] Cleared selection.' )
+      # If not on block and not on floor (unless they have wings), run game tick and reload stage
+      elif g_pos.y + 1 < g_world_size.y and get_tile( g_pos.x, g_pos.y + 1 ) in AIR_BLOCKS and update_inv( I_HARPY_WINGS, 0, mode = 't' ) == 0:
+        tick()
         goto_room( room_scene )
 
-    # Use
-    elif p == 'u':
-
-      USABLES = [ I_SUS_EYE, I_HEALTH_POTION, I_CRYSTAL ]
-
-      # Check if nothing is selected
-      if g_items[ g_slot ][1] <= 0:
-        print( '[#] You don\'t currently have an item selected.' )
-
-      # Check if item has no function
-      elif g_items[ g_slot ][ 0 ] not in USABLES:
-        print( '[#] This item has no "use" functionality.' )
-
-      # Do item-specific use actions
+      # Jump, run game tick, save data, and reload stage
       else:
+        for i in range( jump_height ):
 
-        if g_items[ g_slot ][ 0 ] == I_SUS_EYE:
-          update_inv( I_SUS_EYE, 1, 'r' )
-          start_bossfight()
+          # Move up if possible
+          if g_pos.y > 0 and get_tile( g_pos.x, g_pos.y - 1 ) in AIR_BLOCKS:
+            g_pos.y -= 1
 
-        elif g_items[ g_slot ][ 0 ] == I_HEALTH_POTION:
-          update_inv( I_HEALTH_POTION, 1, 'r' )
-          print( f'[!] You used a healing potion. (+{ min( g_hp + 100, g_hp_max ) - g_hp } HP)' )
-          g_hp = min( g_hp + 100, g_hp_max )
+        data_save()
+        tick( nofall = True )
+        goto_room( room_scene )
+  
+  # Down command
+  elif p == 'd':
+  
+    # Go through platform
+    if g_pos.y < g_world_size.y - 1 and get_tile( g_pos.copy().a( 0, 1 ) ) == 'p':
+      g_pos.a( 0, 1 )
+    tick()
+    goto_room( room_scene )
+
+  # Wait
+  elif p == 'w':
+
+    tick()
+    goto_room( room_scene )
+
+  # Inventory
+  elif p == 'i':
+    goto_room( room_inventory )
+
+  # Select
+  elif p == 's':
+    print( '[#] Must supply slot ID.' )
+
+  elif p[:2] == 's ':
+
+    # Make sure it matches a slot
+    if p[2:] not in list( '1234567890abcdef' ):
+      print( '[#] Enter a number from 0-9 or a letter from A-F.' )
+
+    else:
+
+      # Select slot
+      g_slot = list( '1234567890abcdef' ).index( p[2:] )
+      print( f'[!] Selected "{ item_meta( g_slot, c = 1 ) }".' if g_items[ g_slot ][1] > 0 else '[!] Cleared selection.' )
+      goto_room( room_scene )
+
+  # Use
+  elif p == 'u':
+
+    USABLES = [ I_SUS_EYE, I_HEALTH_POTION, I_CRYSTAL ]
+
+    # Check if nothing is selected
+    if g_items[ g_slot ][1] <= 0:
+      print( '[#] You don\'t currently have an item selected.' )
+
+    # Check if item has no function
+    elif g_items[ g_slot ][ 0 ] not in USABLES:
+      print( '[#] This item has no "use" functionality.' )
+
+    # Do item-specific use actions
+    else:
+
+      if g_items[ g_slot ][ 0 ] == I_SUS_EYE:
+        update_inv( I_SUS_EYE, 1, 'r' )
+        start_bossfight()
+
+      elif g_items[ g_slot ][ 0 ] == I_HEALTH_POTION:
+        update_inv( I_HEALTH_POTION, 1, 'r' )
+        print( f'[!] You used a healing potion. (+{ min( g_hp + 100, g_hp_max ) - g_hp } HP)' )
+        g_hp = min( g_hp + 100, g_hp_max )
+        goto_room( room_scene )
+
+      elif g_items[ g_slot ][ 0 ] == I_CRYSTAL:
+        if g_hp_max < 400:
+          update_inv( I_CRYSTAL, 1, 'r' )
+          print( '[!] You used a life crystal. (+20 MHP)' )
+          g_hp_max += 20
+          g_hp += 20
           goto_room( room_scene )
+        else:
+          print( '[#] Your health is already maxed.' )
 
-        elif g_items[ g_slot ][ 0 ] == I_CRYSTAL:
-          if g_hp_max < 400:
-            update_inv( I_CRYSTAL, 1, 'r' )
-            print( '[!] You used a life crystal. (+20 MHP)' )
-            g_hp_max += 20
-            g_hp += 20
-            goto_room( room_scene )
-          else:
-            print( '[#] Your health is already maxed.' )
+  # Break
+  elif p in ( 'b', 'p', 'z' ):
+    print( '[#] Must supply direction.' )
 
-    # Break
-    elif p == 'b':
-      print( '[#] Must supply direction.' )
+  elif p[:2] in ( 'b ', 'p ', 'z ' ):
 
-    elif p[:2] == 'b ' or p[:2] == 'p ':
+    # Check if it is a direction
+    if p[2:] in ( 'left', 'right', 'down', 'up', 'l', 'r', 'd', 'u' ):
 
-      # Check if it is a direction
-      if p[2:] in ( 'left', 'right', 'down', 'up', 'l', 'r', 'd', 'u' ):
-
-        # Attempt to either break or place the block
-        if p[0] == 'b':
+      # Attempt to either break or place the block
+      try:
+        if p[0] == 'b' or p[0] == 'z':
           try_break_block( *( V2( -1, 0 ), V2( 1, 0 ), V2( 0, 1 ), V2( 0, -1 ) )[ ( 'l', 'r', 'd', 'u' ).index( p[2] ) ].l() )
         elif p[0] == 'p':
           try_place_block( *( V2( -1, 0 ), V2( 1, 0 ), V2( 0, 1 ), V2( 0, -1 ) )[ ( 'l', 'r', 'd', 'u' ).index( p[2] ) ].l() )
         else:
           print( 'ERROR: I messed something up' )
+      except MoveException as m:
+        if p[0] != 'z' or m.arg == '1': raise m
 
-      # Check if it's coordinates
-      elif len( p[2:].split( ' ' ) ) == 2:
+      if p[0] == 'z' and p[2] in ( 'l', 'r' ):
 
-        try:
-          p = [ int( p[2:].split( ' ' )[0] ), int( p[2:].split( ' ' )[1] ), p[0] ]
-        except Exception:
-          print( '[#] Enter 2 numbers.' )
+        parse_scene_cmd( f'm { p[2:] }' )
+      goto_room( room_scene )
 
-        else:
+    # If not, then the z command would have invalid arguments
+    elif p[:2] == 'z':
 
-          # Check range
-          # Temporary variables used for easier formatting
-          x_in_bounds = ( -4 <= p[0] <= 4 )
-          y_in_bounds = ( -4 <= p[1] <= 4 )
-          if not ( x_in_bounds and y_in_bounds ):
-            print( f"[#] { '' if x_in_bounds else 'X' }{ '' if x_in_bounds or y_in_bounds else ' and ' }{ '' if y_in_bounds else 'Y' } coordinate{ '' if x_in_bounds or y_in_bounds else 's' } out of range. (Valid range: [-4, 4])" )
+      print( '[#] The "z" command only takes directional arguments.' )
 
-          # If both coordinates are valid, then continue onward
-          if x_in_bounds and y_in_bounds:
+    # Check if it's coordinates
+    elif len( p[2:].split( ' ' ) ) == 2:
 
-            # Attempt to either break or place the block
-            if p[2] == 'b':
-              try_break_block( p[0], p[1] )
-            else:
-              try_place_block( p[0], p[1] )
+      try:
+        p = [ int( p[2:].split( ' ' )[0] ), int( p[2:].split( ' ' )[1] ), p[0] ]
+      except Exception:
+        print( '[#] Enter 2 numbers.' )
 
-      # Invalid arguments
       else:
-        print( '[#] Enter either a direction or a coordinate pair.' )
 
-    elif p == 'c' or p[0:2] == 'c ':
+        # Check range
+        # Temporary variables used for easier formatting
+        x_in_bounds = ( -4 <= p[0] <= 4 )
+        y_in_bounds = ( -4 <= p[1] <= 4 )
+        if not ( x_in_bounds and y_in_bounds ):
+          print( f"[#] { '' if x_in_bounds else 'X' }{ '' if x_in_bounds or y_in_bounds else ' and ' }{ '' if y_in_bounds else 'Y' } coordinate{ '' if x_in_bounds or y_in_bounds else 's' } out of range. (Valid range: [-4, 4])" )
 
-      # Get coordinates if they're supplied
-      if len( p ) > 1:
+        # If both coordinates are valid, then continue onward
+        if x_in_bounds and y_in_bounds:
 
-        # Attempt cast
-        try:
-          chest_coords = V2( int( p[2:].split( ' ' )[0] ), int( p[2:].split( ' ' )[1] ) )
-        except Exception:
-          print( '[#] Enter 2 numbers.' )
+          # Attempt to either break or place the block
+          if p[2] == 'b':
+            try_break_block( p[0], p[1] )
+          else:
+            try_place_block( p[0], p[1] )
+
+    # Invalid arguments
+    else:
+      print( '[#] Enter either a direction or a coordinate pair.' )
+
+  elif p == 'c' or p[0:2] == 'c ':
+
+    # Get coordinates if they're supplied
+    if len( p ) > 1:
+
+      # Attempt cast
+      try:
+        chest_coords = V2( int( p[2:].split( ' ' )[0] ), int( p[2:].split( ' ' )[1] ) )
+      except Exception:
+        print( '[#] Enter 2 numbers.' )
+        chest_coords = 'ERROR'
+      else:
+
+        # Check range
+        x_in_bounds = ( -4 <= chest_coords.x <= 4 )
+        y_in_bounds = ( -4 <= chest_coords.y <= 4 )
+        if not ( x_in_bounds and y_in_bounds ):
+          print( f"[#] { '' if x_in_bounds else 'X' }{ '' if x_in_bounds or y_in_bounds else ' and ' }{ '' if y_in_bounds else 'Y' } coordinate{ '' if x_in_bounds or y_in_bounds else 's' } out of range. (Valid range: [-4, 4])" )
           chest_coords = 'ERROR'
-        else:
 
-          # Check range
-          x_in_bounds = ( -4 <= chest_coords.x <= 4 )
-          y_in_bounds = ( -4 <= chest_coords.y <= 4 )
-          if not ( x_in_bounds and y_in_bounds ):
-            print( f"[#] { '' if x_in_bounds else 'X' }{ '' if x_in_bounds or y_in_bounds else ' and ' }{ '' if y_in_bounds else 'Y' } coordinate{ '' if x_in_bounds or y_in_bounds else 's' } out of range. (Valid range: [-4, 4])" )
-            chest_coords = 'ERROR'
+    # Else default to (0, 0)
+    else:
+      chest_coords = V2( 0, 0 )
 
-      # Else default to (0, 0)
+    # If coordinates are correct, try to open chest
+    if chest_coords != 'ERROR':
+
+      if get_tile( g_pos.copy().a( chest_coords ) ) != 'c':
+        print( '[#] There is not a chest at the block specified.' )
+
+      # Success
       else:
-        chest_coords = V2( 0, 0 )
+        goto_room( room_chest, f'0,{ g_pos.copy().a( chest_coords ).x },{ g_pos.copy().a( chest_coords ).y }' )
 
-      # If coordinates are correct, try to open chest
-      if chest_coords != 'ERROR':
+  # Debug command (requires debug mode)
+  elif p == '$' and DEBUG:
+    print( '[#] Must supply a sub-command.')
 
-        if get_tile( g_pos.copy().a( chest_coords ) ) != 'c':
-          print( '[#] There is not a chest at the block specified.' )
+  elif p[:2] == '$ ' and DEBUG:
 
-        # Success
-        else:
-          goto_room( room_chest, f'0,{ g_pos.copy().a( chest_coords ).x },{ g_pos.copy().a( chest_coords ).y }' )
+    # Jump to position
+    if p[2:] == 'jump' or p[2:] == 'shift':
+      print( '[#] Must supply coordinates.' )
 
-    # Debug command (requires debug mode)
-    elif p == '$' and DEBUG:
-      print( '[#] Must supply a sub-command.')
+    elif p[2:7] == 'jump ' or p[2:8] == 'shift ':
 
-    elif p[:2] == '$ ' and DEBUG:
-
-      # Jump to position
-      if p[2:] == 'jump' or p[2:] == 'shift':
-        print( '[#] Must supply coordinates.' )
-
-      elif p[2:7] == 'jump ' or p[2:8] == 'shift ':
-
-        # Attempt casting coordinates
-        try:
-          dest_coords = V2( int( p[ ( 7 if p[2] == 'j' else 8 ): ].split( ' ' )[0] ), int( p[ ( 7 if p[2] == 'j' else 8 ): ].split( ' ' )[1] ) )
-          if p[2] == 's':
-            dest_coords.a( g_pos )
-        except Exception:
-          print( "[#] Invalid coordinates." )
-        else:
-
-          # Make sure coordinates are within world border
-          if dest_coords.x < 0 or dest_coords.y < 0 or dest_coords.x >= g_world_size.x or dest_coords.y > g_world_size.y:
-            print( 'Those coordinates are out of this world!\n(No, really)')
-          else:
-            g_pos = dest_coords
-            data_save()
-            print( f'[!] Moved player to ({ dest_coords.x }, { dest_coords.y })' )
-            goto_room( room_scene )
-
-      # Give/remove item
-      elif p[2:] == 'give' or p[2:] == 'take':
-        print( '[#] Must supply item info.' )
-
-      elif p[2:7] == 'give ' or p[2:7] == 'take ':
-
-        # Attempt casting info
-        try:
-          item_info = [ p[7:].split( ' ' )[0], int( p[7:].split( ' ' )[1] ) ]
-        except Exception:
-          print( '[#] Enter an item ID followed by a number.' )
-        else:
-
-          # Give/remove and print info
-          try:
-
-            # Filter input
-            item_info[0] = 'I_' + ''.join( [ j.upper() for j in item_info[0] if j not in ( ')', '(', ' ', '.' ) ] )[ :20 ]
-
-            if p[2] == 'g':
-              exec( 'update_inv( ' + item_info[0] + ', item_info[1] )' )
-              exec( 'print( f\'[!] Gave you "{ item_meta( ' + item_info[0] + ' ) }" x{ item_info[1] }\' )' )
-            else:
-              exec( 'amount_removed = update_inv( ' + item_info[0] + ', item_info[1], mode = \'r\' )' )
-              exec( 'print( f\'[!] Removed "{ item_meta( ' + item_info[0] + ' ) }" x{ amount_removed }\' )' )
-            goto_room( room_scene )
-          except Exception:
-            print( '[#] Invalid item ID.' )
-
-      # Set block
-      elif p[2:] == 'set':
-        print( '[#] Must supply coordinates.' )
-
-      elif p[2:6] == 'set ':
-
-        # Attempt casting coordinates
-        try:
-          block_coords = g_pos.copy().a( int( p[ 6: ].split( ' ' )[0] ), int( p[ 6: ].split( ' ' )[1] ) )
-        except Exception:
-          print( "[#] Invalid coordinates." )
-        else:
-
-          # Make sure coordinates are within world border
-          if block_coords.x < 0 or block_coords.y < 0 or block_coords.x >= g_world_size.x or block_coords.y > g_world_size.y:
-            print( 'Those coordinates are out of this world!\n(No, really)')
-
-          # Make sure they gave a block ID
-          elif not ( len( p[ 6: ].split( ' ' ) ) == 3 and p[ 6: ].split( ' ' )[2] != '' ):
-            print( '[#] Incorrect number of arguments.' )
-
-          # Update the block
-          else:
-            g_tile_data[ xy2c( *block_coords.l(), g_world_size.x ) ] = p_def[ 6: ].split( ' ' )[2]
-            data_save()
-            print( f"[!] Set block to ID '{ p_def[ 6: ].split( ' ' )[2] }'" )
-            goto_room( room_scene )
-
-      # Fight monster
-      elif p[2:] == 'fight':
-        print( '[#] Must supply monster ID.' )
-
-      elif p[2:8] == 'fight ':
-
-        # Check monster ID
-        if p[8:] not in Monster.TYPES:
-          print( '[#] Invalid monster ID.' )
-        else:
-          start_fight( p[8:] )
-
-      # Execute code
-      elif p[2:] == 'execute':
-        print( '[#] Must supply code.' )
-
-      elif p[2:10] == 'execute ':
-
-        exec( p[10:] )
-
-      # Invalid input
+      # Attempt casting coordinates
+      try:
+        dest_coords = V2( int( p[ ( 7 if p[2] == 'j' else 8 ): ].split( ' ' )[0] ), int( p[ ( 7 if p[2] == 'j' else 8 ): ].split( ' ' )[1] ) )
+        if p[2] == 's':
+          dest_coords.a( g_pos )
+      except Exception:
+        print( "[#] Invalid coordinates." )
       else:
-        print( '[#] Unknown debug sub-command.' )
+
+        # Make sure coordinates are within world border
+        if dest_coords.x < 0 or dest_coords.y < 0 or dest_coords.x >= g_world_size.x or dest_coords.y > g_world_size.y:
+          print( 'Those coordinates are out of this world!\n(No, really)')
+        else:
+          g_pos = dest_coords
+          data_save()
+          print( f'[!] Moved player to ({ dest_coords.x }, { dest_coords.y })' )
+          goto_room( room_scene )
+
+    # Give/remove item
+    elif p[2:] == 'give' or p[2:] == 'take':
+      print( '[#] Must supply item info.' )
+
+    elif p[2:7] == 'give ' or p[2:7] == 'take ':
+
+      # Attempt casting info
+      try:
+        item_info = [ p[7:].split( ' ' )[0], int( p[7:].split( ' ' )[1] ) ]
+      except Exception:
+        print( '[#] Enter an item ID followed by a number.' )
+      else:
+
+        # Give/remove and print info
+        try:
+
+          # Filter input
+          item_info[0] = 'I_' + ''.join( [ j.upper() for j in item_info[0] if j not in ( ')', '(', ' ', '.' ) ] )[ :20 ]
+
+          if p[2] == 'g':
+            exec( 'update_inv( ' + item_info[0] + ', item_info[1] )' )
+            exec( 'print( f\'[!] Gave you "{ item_meta( ' + item_info[0] + ' ) }" x{ item_info[1] }\' )' )
+          else:
+            exec( 'amount_removed = update_inv( ' + item_info[0] + ', item_info[1], mode = \'r\' )' )
+            exec( 'print( f\'[!] Removed "{ item_meta( ' + item_info[0] + ' ) }" x{ amount_removed }\' )' )
+          goto_room( room_scene )
+        except Exception:
+          print( '[#] Invalid item ID.' )
+
+    # Set block
+    elif p[2:] == 'set':
+      print( '[#] Must supply coordinates.' )
+
+    elif p[2:6] == 'set ':
+
+      # Attempt casting coordinates
+      try:
+        block_coords = g_pos.copy().a( int( p[ 6: ].split( ' ' )[0] ), int( p[ 6: ].split( ' ' )[1] ) )
+      except Exception:
+        print( "[#] Invalid coordinates." )
+      else:
+
+        # Make sure coordinates are within world border
+        if block_coords.x < 0 or block_coords.y < 0 or block_coords.x >= g_world_size.x or block_coords.y > g_world_size.y:
+          print( 'Those coordinates are out of this world!\n(No, really)')
+
+        # Make sure they gave a block ID
+        elif not ( len( p[ 6: ].split( ' ' ) ) == 3 and p[ 6: ].split( ' ' )[2] != '' ):
+          print( '[#] Incorrect number of arguments.' )
+
+        # Update the block
+        else:
+          g_tile_data[ xy2c( *block_coords.l(), g_world_size.x ) ] = p_def[ 6: ].split( ' ' )[2]
+          data_save()
+          print( f"[!] Set block to ID '{ p_def[ 6: ].split( ' ' )[2] }'" )
+          goto_room( room_scene )
+
+    # Fight monster
+    elif p[2:] == 'fight':
+      print( '[#] Must supply monster ID.' )
+
+    elif p[2:8] == 'fight ':
+
+      # Check monster ID
+      if p[8:] not in Monster.TYPES:
+        print( '[#] Invalid monster ID.' )
+      else:
+        start_fight( p[8:] )
+
+    # Execute code
+    elif p[2:] == 'execute':
+      print( '[#] Must supply code.' )
+
+    elif p[2:10] == 'execute ':
+
+      exec( p[10:] )
 
     # Invalid input
     else:
-      print( '[#] Unknown command.' )
+      print( '[#] Unknown debug sub-command.' )
+
+  # Invalid input
+  else:
+    print( '[#] Unknown command.' )
+
+  return False
 
 # Inventory Room
 def room_inventory( arg = "" ):
@@ -2821,7 +2903,7 @@ def room_inventory( arg = "" ):
       for i in g_items_extra.copy():
 
         # Attempt to give it to the player, and remove it from their extra items
-        if update_inv( i[0], i[1] ):
+        if update_inv( i[0], i[1], allow_stash = False ):
           g_items_extra.remove( i )
 
       # Show error message if at least some extra items are still there
@@ -2982,7 +3064,8 @@ def room_crafting( arg = '' ):
     { 'req': { I_GOLD_BAR: 30 }, 'res': [ I_G_BOW, 1 ] },
     { 'req': { I_IRON_BAR: 30 }, 'res': [ I_I_ARMOR, 1 ] },
     { 'req': { I_SILVER_BAR: 30 }, 'res': [ I_S_ARMOR, 1 ] },
-    { 'req': { I_GOLD_BAR: 30 }, 'res': [ I_G_ARMOR, 1 ] }
+    { 'req': { I_GOLD_BAR: 30 }, 'res': [ I_G_ARMOR, 1 ] },
+    { 'req': { I_LENS: 6 }, 'res': [ I_SUS_EYE, 1 ] }
   ]
 
   # Try extracting page from argument
@@ -3262,7 +3345,7 @@ def room_chest( arg = '' ):
             else:
 
               # Attempt to take item (reload chest)
-              if update_inv( chest_slot( *chest_coords.l(), slot_num ), min( chest_slot( *chest_coords.l(), slot_num ), p ) ):
+              if update_inv( chest_slot( *chest_coords.l(), slot_num ), min( chest_slot( *chest_coords.l(), slot_num, amount = True ), p ) ):
                 chest_slot( *chest_coords.l(), slot_num, chest_slot( *chest_coords.l(), slot_num, amount = True ) - min( chest_slot( *chest_coords.l(), slot_num, amount = True ), p ), amount = True, op = '=' )
                 goto_room( room_chest, '0' + arg[1:] )
 
