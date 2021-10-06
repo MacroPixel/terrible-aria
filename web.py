@@ -1,8 +1,10 @@
-WEB = False
+WEB = True
 
 if WEB:
   from browser import document
   from browser import aio as aio
+else:
+  import asyncio as aio
 
 import os
 from math import sin, cos
@@ -247,10 +249,7 @@ async def input( text ):
 old_sleep = time.sleep
 async def sleep( ms ):
 
-  if WEB:
-    await aio.sleep( ms )
-  else:
-    old_sleep( ms )
+  await aio.sleep( ms )
   return
 
 # Returns a number such that min <= x <= max
@@ -1876,7 +1875,8 @@ async def room_menu():
   
   # Keep looping until a valid input is provided
   while True:
-    p = await input( '> ' ).lower()
+    # p = await input( '> ' ).lower()
+    p = ''
 
     # Play
     if p == 'p':
@@ -3293,9 +3293,9 @@ async def run():
       # Move between rooms
       try:
         if arg == "":
-          room()
+          await room()
         else:
-          room( arg )
+          await room( arg )
       except MoveException as m:
         room = m.room
         arg = m.arg
