@@ -157,8 +157,8 @@ ITEM_META = [
 ]
 
 # GLOBAL CONSTANTS
-DEBUG = True
-SHOW_PROG = False
+DEBUG = False
+SHOW_PROG = True
 AIR_BLOCKS = [ ' ', 'l', 'L', 'c', 'C', 'p' ]
 PLATFORM_BLOCKS = [ 'p' ]
 ITEM_BLOCKS = { 'g': I_GRASS, 's': I_STONE, 'w': I_WOOD, 'l': I_WOOD, 'i': I_IRON_ORE, 'S': I_SILVER_ORE, 'G': I_GOLD_ORE,
@@ -853,14 +853,15 @@ class Monster:
 class EyeOfCthulhu( Monster ):
 
   # The player's options for each player turn
-  # Format: [ Letter ID, Action Name, Requirements, Req. Angle ]
-  PLAYER_ATTACKS = [ [ 's', 'Swing sword (*)', 's', 1 ], [ 'r', 'Shoot rightward', 'b', 0 ], [ 'l', 'Shoot leftward', 'b', 2 ],
-  [ 'd', 'Shoot downward', 'b', 3 ], [ 'x', 'Throw grenade rightward', 'g', 0 ], [ 'y', 'Throw grenade leftward', 'g', 2 ],
-  [ 'z', 'Throw grenade downward', 'g', 3 ] ]
+  # Format: [ Letter ID, Action Name, Requirements, Hit Angles ]
+  PLAYER_ATTACKS = [ [ 'j', 'Jump', '', -1 ], [ 's', 'Swing sword', 's', 2 ], [ 'r', 'Shoot rightward', 'b', 0 ], [ 'l', 'Shoot leftward', 'b', 4 ],
+  [ 'd', 'Shoot downward', 'b', 6 ], [ 'x', 'Throw grenade rightward', 'g', ( 7, 0 ) ], [ 'y', 'Throw grenade leftward', 'g', ( 4, 5 ) ],
+  [ 'z', 'Throw grenade downward', 'g', 6 ] ]
 
   # The player's options for each monster turn
-  # Format: [ Letter ID, Action Name, Requirements ]
-  PLAYER_DODGES = [ [ 'j', 'Jump', '', 1 ], [ 'f', 'Fall', '', 1 ], [ 'r', 'Dodge rightward', '', 0 ], [ 'l', 'Dodge leftward', '', 0 ], [ 'g', 'Counter with grenade', 'g', -1 ] ]
+  # Format: [ Letter ID, Action Name, Hit Angles ]
+  PLAYER_DODGES = [ [ 'j', 'Jump', '', 2 ], [ 'r', 'Dodge rightward', '', 0 ], [ 'l', 'Dodge leftward', '', 4 ],
+  [ 'x', 'Jump and dodge rightward', 1 ], [ 'z', 'Jump and dodge leftward', 3 ] ]
 
   # Determines the damage each weapon does
   # (Can't have it defined for each possible outcome like in the base class b/c
@@ -869,13 +870,12 @@ class EyeOfCthulhu( Monster ):
 
   def __init__( self ):
 
-    self.hp = 2048
+    self.hp = 1024
 
     self.move = [ random.randint( 0, 3 ), random.choice( list( 'abc' ) ) ]
     self.move_0 = self.move
     self.move_c = 0
-
-    self.angle = random.randint( 0, 3 )
+    self.stage = 1
 
     self.charged = False
 
@@ -912,121 +912,176 @@ class EyeOfCthulhu( Monster ):
         print( f'[{ s[0].upper() }] { s[1] } { suffix }' )
       options_list.append( s[0].lower() )
 
+    if player_turn and update_inv( I_HEALTH_POTION, 0, 't' ) > 0:
+      print( '[H] Drink health potion' )
+      options_list.append( 'h' )
+
     return options_list
   
   def turn( self, p, player_turn ):
 
-    # Loop through each attack
-    for i in range( 3 ):
+    global g_hp
 
-      # Allows attacks to do the proper amount of damage
-      self.update_stats()
+    if player_turn:
+      p = p.split( ' ' )
 
-      # Update they eye's position
-      if player_turn:
+    # Allows attacks to do the proper amount of damage
+    self.update_stats()
 
-        # Stays stationary on the first turn
+    # Decide the angles for each move
+    # Angles are as follows:
+    # 3  2  1
+    # 4  P  0     (P = Player's start pos)
+    # 5  6  7
 
-        # Moves based on number in the second turn
-        if i == 1:
-          self.angle = ( self.angle + self.move[0] ) % 4
+    print( self.move )
 
-        # Moves based on letter in the third turn
-        if i == 2:
-          self.angle = ( self.angle + 1 + list( 'abc' ).index( self.move[1] ) ) % 4
+    if player_turn:
 
-      else:
+      # Decide the eye's position
+      angle = ( self.move[0] * 2 + ( 1, 3, 0 )[ list( 'abc' ).index( self.move[1] ) ] ) % 8
 
-        # Servant turn based off of letter
-        if i == list( 'abc' ).index( self.move[1] ):
-          self.angle = -1
+      # The player gets 3 turns if they're attacking
+      # Otherwise the enemy gets 1 or 2 turns depending on its stage
+      for i in range( 3 ):
 
-        # Perform number-based charge
-        elif i == 0 or ( i == 1 and self.move[1] == 'a' ):
-          self.angle = ( self.angle + self.move[0] ) % 4
+        # Drink health potion
+        if p[i] == 'h':
 
-        # Perform letter-based charge
-        elif i == 2 or ( i == 1 and self.move[1] == 'c' ):
-          self.angle = ( self.angle + list( 'abc' ).index( self.move[1] ) ) % 4
+          # Damage method determines what gear the player used, and therefore, how much damage the entity should take
+          dmg_method = ''
+          dmg_method_text = ''
 
-      # Damage method determines what gear the player used, and therefore, how much damage the entity should take
-      if player_turn:
-        dmg_method = [ j for j in self.PLAYER_ATTACKS if j[0] == p[i] ][0]
-      else:
-        dmg_method = [ j for j in self.PLAYER_DODGES if j[0] == p[i] ][0]
-      dmg_method = ( '' if len( dmg_method ) < 3 else dmg_method[2] )
+          # Make sure player has a health potion
+          has_item = update_inv( I_HEALTH_POTION, 0, 't' ) > 0
 
-      # Remove items
-      if dmg_method == 'b':
-        update_inv( I_ARROW if self.weapon_bow[1] == 'arrow' else I_F_ARROW, 1, 'r' )
-      elif dmg_method == 'g':
-        update_inv( I_GRENADE, 1, 'r' )
+          # Remove items
+          update_inv( I_HEALTH_POTION, 1, 'r' )
 
-      # Make sure player has their requred item
-      has_item = True
-      if dmg_method == 's' and self.weapon_melee == 'none':
-        has_item = False
-      if dmg_method == 'b' and 'none' in self.weapon_bow:
-        has_item = False
-      if dmg_method == 'g' and self.weapon_grenade == 'none':
-        has_item = False
+          # Determine the string to print regarding the eye's direction
+          dmg_amount = 0
+          temp_dir = ( 'to the right', 'upward and rightward', 'upward', 'upward and leftward', 'to the left',
+            'leftward and downward', 'downward', 'rightward and downward' )[ angle ]
+          attack_angles = [ -2 ]
 
-      # Get result of action [text, damage, modifiers]
-      if player_turn:
+        else:
 
-        dmg_amount = 0
-        
-        temp_dir = ( 'to the right', 'upward', 'to the left', 'downward' )[ self.angle ]
-        attack_angle = [ j for j in self.PLAYER_ATTACKS if j[0] == p[i] ][0][3]
-        if attack_angle == self.angle and has_item:
-          if p[i] == 's' and random.choice( ( True, False ) ):
-            print( f'[!] The enemy flew { temp_dir }, and you barely missed it.' )
+          # Damage method determines what gear the player used, and therefore, how much damage the entity should take
+          dmg_method = [ j for j in self.PLAYER_ATTACKS if j[0] == p[i] ][0]
+          dmg_method = ( '' if len( dmg_method ) < 3 else dmg_method[2] )
+          dmg_method_text = ( 'swung your sword', 'shot an arrow', 'threw a grenade', '' )[ ( 's', 'b', 'g', '' ).index( dmg_method ) ]
+
+          # Remove items
+          if dmg_method == 'b':
+            update_inv( I_ARROW if self.weapon_bow[1] == 'arrow' else I_F_ARROW, 1, 'r' )
+          elif dmg_method == 'g':
+            update_inv( I_GRENADE, 1, 'r' )
+
+          # Make sure player has their requred item
+          has_item = True
+          if dmg_method == 's' and self.weapon_melee == 'none':
+            has_item = False
+          if dmg_method == 'b' and 'none' in self.weapon_bow:
+            has_item = False
+          if dmg_method == 'g' and self.weapon_grenade == 'none':
+            has_item = False
+
+          # Get result of action
+          dmg_amount = 0
+            
+          # Determine the string to print regarding the eye's direction
+          # As well as at which angle the player is attacking
+          temp_dir = ( 'to the right', 'upward and rightward', 'upward', 'upward and leftward', 'to the left',
+            'leftward and downward', 'downward', 'righward and downward' )[ angle ]
+          attack_angles = [ j for j in self.PLAYER_ATTACKS if j[0] == p[i] ][0][3]
+          if isinstance( attack_angles, int ):
+            attack_angles = [ attack_angles ]
           else:
-            print( f'[!] The enemy flew { temp_dir }, and you hit it.' )
-            dmg_amount = self.damage( *self.DAMAGE_RANGES[ dmg_method ], entity = 'self', method = dmg_method )
+            attack_angles = list( attack_angles )
+
+          # Add height to attack if the player jumped
+          if i > 0 and p[ i - 1 ] == 'j':
+            for j in range( len( attack_angles ) ):
+              if attack_angles[j] in ( 7, 0, 4, 5 ):
+                attack_angles[j] = ( 0, 1, 3, 4 )[ ( 7, 0, 4, 5 ).index( attack_angles[j] ) ]
+
+        # Firstly, print which direction the enemy went
+        if i == 0:
+          print( f'[!] The enemy flew { temp_dir }.' )
+
+        # Then print the effect of the player's attack
+        if -1 in attack_angles:
+          print( '[!] You jumped, allowing you to be higher up for the next attack.' )
+        elif -2 in attack_angles and has_item:
+          print( '[!] You used a healing potion.' )
+          print( f'[*] YOU: +{ min( g_hp + 100, g_hp_max ) - g_hp } HP' )
+          g_hp = min( g_hp + 100, g_hp_max )
+        elif -2 in attack_angles and not has_item:
+          print( f'[!] You ran out of healing potions.' )
+        elif angle in attack_angles and has_item:
+          print( f'[!] You { dmg_method_text } and hit the enemy.' )
+          dmg_amount = self.damage( *self.DAMAGE_RANGES[ dmg_method ], entity = 'self', method = dmg_method )
         elif has_item:
-          print( f'[!] The enemy flew { temp_dir }, so your attack missed.' )
+          print( f'[!] You { dmg_method_text }, but you missed the enemy.' )
         else:
           print( f'[!] You ran out of the weapon necessary to perform this attack.' )
 
-      else:
-        
+        # Display text
+        if dmg_amount == 0:
+          print( f"[*] Boss: NO DAMAGE"  )
+        elif dmg_amount != 0:
+          print( f"[*] Boss: -{ dmg_amount } HP" )
+
+        # Check if fight is over
+        self.hp_check()
+
+        # Wait
+        time.sleep( 0.5 )
+
+    else:
+
+      # Attack twice if in second stage
+      for i in range( self.stage ):
+
+        # Decide the eye's charge direction (angle = the start angle; charges to the opposite angle)
+        angle = ( self.move[0] + i + 1 + list( 'abc' ).index( self.move[1] ) ) % 4
+
+        # Damage method determines what gear the player used, and therefore, how much damage the entity should take
+        dmg_method = [ j for j in self.PLAYER_DODGES if j[0] == p ][0]
+        dmg_method = ( '' if len( dmg_method ) < 3 else dmg_method[2] )
+
+        # Get result of action
         dmg_amount = 0
 
-        temp_dir = ( '', 'leftward', 'downward', 'rightward', 'upward' )[ self.angle + 1 ]
-        temp_move = ( '', 'jumping', 'falling downward', 'moving rightward', 'moving leftward' )[ list( 'gjfrl' ).index( p[i] ) ]
-        dodge_angle = [ j for j in self.PLAYER_DODGES if j[0] == p[i] ][0][3]
+        temp_dir = 'from the ' + ( 'right', 'upper-right', 'top', 'upper-left', 'left', 'bottom-left', 'bottom', 'bottom-right' )[ angle + random.choice( ( 0, 4 ) ) ]
+        dodge_angle = [ j for j in self.PLAYER_DODGES if j[0] == p ][0][3]
+        if dodge_angle >= 4:
+          dodge_angle -= 1
 
-        if self.angle != -1 and dodge_angle != -1 and self.angle % 2 != dodge_angle:
-          print( f'The enemy charged { temp_dir }, and you dodged it by { temp_move }.' )
-        elif self.angle != -1 and dodge_angle != -1:
-          print( f'The enemy charged { temp_dir } and hit you.' )
+        # Hit the player if they're in range of the start or finish position
+        if dodge_angle == angle:
+          print( f'[!] The enemy charged { temp_dir }, and it hit you.' )
           dmg_amount = self.damage( 40, 100, entity = 'you', method = dmg_method )
-        elif self.angle != -1 and dodge_angle == -1:
-          print( f'The enemy charged { temp_dir }, and your grenade didn\'t counter its attack.' )
-          dmg_amount = self.damage( 40, 100, entity = 'you', method = dmg_method )
-        elif self.angle == -1 and dodge_angle != -1:
-          print( f'The enemy sent two Servants of Cthulhu after you, and you only dodged one of them.' )
-          dmg_amount = self.damage( 30, 50, entity = 'you', method = dmg_method )
-        elif self.angle == -1 and dodge_angle == -1:
-          print( f'The enemy sent two Servants of Cthulhu after you, and your grenade killed both of them.' )
-
-        if self.angle == -1:
-          self.angle = 1
         else:
-          self.angle = ( self.angle + 2 ) % 4
+          print( f'[!] The enemy charged { temp_dir }, and you dodged its attack.' )
 
-      # Display text
-      if dmg_amount == 0:
-        print( f"[*] { 'Boss' if player_turn else 'You' }: NO DAMAGE"  )
-      elif dmg_amount != 0:
-        print( f"[*] { 'Boss' if player_turn else 'You' }: -{ dmg_amount } HP"  )
+        # Display text
+        if dmg_amount == 0:
+          print( f"[*] You: NO DAMAGE"  )
+        elif dmg_amount != 0:
+          print( f"[*] You: -{ dmg_amount } HP" )
 
-      # Check if fight is over
-      self.hp_check()
+        # Check if fight is over
+        self.hp_check()
 
-      # Wait
-      time.sleep( 0.5 )
+        # Wait
+        time.sleep( 0.5 )
+
+    # Transform stage if necessary
+    if self.stage == 1 and self.hp <= 512:
+      self.stage = 2
+      time.sleep( 0.6 )
+      print( '[!!!] The enemy progressed to Stage 2!' )
 
     # Advance move
     self.advance_move()
@@ -1036,7 +1091,12 @@ class EyeOfCthulhu( Monster ):
 
     if self.hp <= 0:
       print_line()
-      print( f"[!] Eye of Cthulhu was killed." )
+      for c in 'Eye of Cthulhu has been defeated!':
+        print( c, end = '', flush = True )
+        time.sleep( 0.065 )
+      time.sleep( 2 )
+      print( '[!] You received 1x Trophy.' )
+      update_inv( I_TROPHY, 1 )
       input( '[!] Press enter to exit the fight. ' )
       goto_room( room_scene )
 
@@ -1050,7 +1110,7 @@ class EyeOfCthulhu( Monster ):
 
     self.move_c += 1
     self.move[0] = ( self.move[0] + ( 2 if self.move_c % 2 else 3 ) ) % 4
-    self.move[1] = list( 'bca' )[ list( 'abc' ).index( self.move[1] ) ]
+    self.move[1] = list( 'cab' )[ list( 'abc' ).index( self.move[1] ) ]
 
 # Switches rooms
 def goto_room( room, arg = '' ):
@@ -3051,7 +3111,6 @@ def room_crafting( arg = '' ):
     { 'req': { I_ARROW: 5, I_TORCH: 1 }, 'res': [ I_F_ARROW, 5 ] },
     { 'req': { I_WOOD: 5 }, 'res': [ I_PLATFORM, 2 ] },
     { 'req': { I_WOOD: 12, I_IRON_BAR: 2 }, 'res': [ I_CHEST, 1 ] },
-    { 'req': { I_FEATHER: 24 }, 'res': [ I_HARPY_WINGS, 1 ] },
     { 'req': { I_IRON_ORE: 3 }, 'res': [ I_IRON_BAR, 1 ] },
     { 'req': { I_SILVER_ORE: 3 }, 'res': [ I_SILVER_BAR, 1 ] },
     { 'req': { I_GOLD_ORE: 3 }, 'res': [ I_GOLD_BAR, 1 ] },
@@ -3065,6 +3124,7 @@ def room_crafting( arg = '' ):
     { 'req': { I_IRON_BAR: 30 }, 'res': [ I_I_ARMOR, 1 ] },
     { 'req': { I_SILVER_BAR: 30 }, 'res': [ I_S_ARMOR, 1 ] },
     { 'req': { I_GOLD_BAR: 30 }, 'res': [ I_G_ARMOR, 1 ] },
+    { 'req': { I_FEATHER: 18 }, 'res': [ I_HARPY_WINGS, 1 ] },
     { 'req': { I_LENS: 6 }, 'res': [ I_SUS_EYE, 1 ] }
   ]
 
@@ -3464,7 +3524,7 @@ def room_bossfight():
 
     # Turn
     elif len( p.split( ' ' ) ) == 3 and False not in [ i in allowed_inputs for i in p.split( ' ' ) ]:
-      g_monster.turn( p.split( ' ' ), player_turn = True )
+      g_monster.turn( p, player_turn = True )
       break
 
     elif len( p.split( ' ' ) ) != 3:
@@ -3479,7 +3539,6 @@ def room_bossfight():
   print( f'You: { g_hp } HP' )
   print( f"Eye of Cthulhu: { g_monster.hp } HP" )
   allowed_inputs = g_monster.get_options( player_turn = False )
-  print( '\n(CHOOSE A 3-MOVE COMBO)\n' )
   print( '[*] Pause' )
 
   # Get inputs
@@ -3491,12 +3550,12 @@ def room_bossfight():
       goto_room( room_pause, 'goto_room( room_bossfight )' )
 
     # Escape
-    elif '!' in p:
+    elif p == '!':
       print( '[!] There is no escape.' )
 
     # Turn
-    elif len( p.split( ' ' ) ) == 3 and False not in [ i in allowed_inputs for i in p.split( ' ' ) ]:
-      g_monster.turn( p.split( ' ' ), player_turn = False )
+    elif p in allowed_inputs:
+      g_monster.turn( p, player_turn = False )
       break
 
     # Invalid input
@@ -3599,6 +3658,8 @@ def run():
   except Exception:
     print( '[CRASH]' )
     print( traceback.format_exc() )
+    print( 'Oops, looks like you\'ve found a bug.' )
+    print( 'Send me an email about it (macropixelyt@gmail.com), and I\'ll fix it as soon as possible.\n' )
 
   # Wait for input before ending program
   # (Windows consoles automatically close upon the end of a program,
